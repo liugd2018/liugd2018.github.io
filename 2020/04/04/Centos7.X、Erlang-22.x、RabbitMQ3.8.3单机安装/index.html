@@ -1,0 +1,103 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="description" content=""><title>Centos7.X、Erlang-22.x、RabbitMQ3.8.3单机安装 | 随心所欲</title><link rel="stylesheet" type="text/css" href="/css/style.css?v=0.0.0"><link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/normalize.css/normalize.min.css"><link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/purecss/build/pure-min.min.css"><link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/purecss/build/grids-responsive-min.css"><link rel="stylesheet" href="//cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css"><script type="text/javascript" src="//cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"></script><link rel="icon" mask="" sizes="any" href="/favicon.ico"><link rel="Shortcut Icon" type="image/x-icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png"><link rel="alternate" type="application/atom+xml" href="/atom.xml"><script type="text/javascript" src="//cdn.jsdelivr.net/npm/clipboard/dist/clipboard.min.js"></script><script type="text/javascript" src="//cdn.jsdelivr.net/gh/codeseven/toastr/build/toastr.min.js"></script><link rel="stylesheet" href="//cdn.jsdelivr.net/gh/codeseven/toastr/build/toastr.min.css"><meta name="generator" content="Hexo 5.1.1"></head><body><div class="body_container"><div id="header"><div class="site-name"><h1 class="hidden">Centos7.X、Erlang-22.x、RabbitMQ3.8.3单机安装</h1><a id="logo" href="/.">随心所欲</a><p class="description"></p></div><div id="nav-menu"><a class="current" href="/."><i class="fa fa-home"> 首页</i></a><a href="/archives/"><i class="fa fa-archive"> 归档</i></a><a href="/about/"><i class="fa fa-user"> 关于</i></a><a href="/atom.xml"><i class="fa fa-rss"> 订阅</i></a></div></div><div class="pure-g" id="layout"><div class="pure-u-1 pure-u-md-3-4"><div class="content_container"><div class="post"><h1 class="post-title">Centos7.X、Erlang-22.x、RabbitMQ3.8.3单机安装</h1><div class="post-meta">2020-04-04<span> | </span><span class="category"><a href="/categories/%E6%8A%80%E6%9C%AF/">技术</a></span></div><div class="post-content"><h2 id="一、下载"><a href="#一、下载" class="headerlink" title="一、下载"></a>一、下载</h2><p>在centos上安装三个程序Erlang、socat、rabbitmq-service。</p>
+<p>建议新手使用npm安装，对新手比较友好。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Erlang: wget https:&#x2F;&#x2F;dl.bintray.com&#x2F;rabbitmq-erlang&#x2F;rpm&#x2F;erlang&#x2F;22&#x2F;el&#x2F;7&#x2F;x86_64&#x2F;erlang-22.2.8-1.el7.x86_64.rpm -b -c </span><br><span class="line"></span><br><span class="line">RabbitMQ-Server: wget https:&#x2F;&#x2F;github.com&#x2F;rabbitmq&#x2F;rabbitmq-server&#x2F;releases&#x2F;download&#x2F;v3.8.3&#x2F;rabbitmq-server-3.8.3-1.el7.noarch.rpm -b -c </span><br></pre></td></tr></table></figure>
+
+<p>Wget [选项] …[URl]….</p>
+<p>​    -b, -background 启动后进入后台操作。</p>
+<p>​    -c, –continue 继续接收已下载了一部分的文件。</p>
+<p>​    tail -f wget-log 查询当前下载任务的进度</p>
+<p>Wget 详细用法：</p>
+<blockquote>
+<p><a target="_blank" rel="noopener" href="https://www.jianshu.com/p/2e2ba8ecc22a">https://www.jianshu.com/p/2e2ba8ecc22a</a></p>
+</blockquote>
+<h2 id="二、安装"><a href="#二、安装" class="headerlink" title="二、安装"></a>二、安装</h2><ul>
+<li><p>Erlang安装</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">rpm -ivh erlang-22.2.8-1.el7.x86_64.rpm</span><br></pre></td></tr></table></figure>
+
+<img src="https://raw.githubusercontent.com/liugd2018/img-folder/main/note/rabbitmq/image-20200404191535458.png" alt="image-20200404191535458" style="zoom:50%;" />
+
+
+
+</li>
+</ul>
+<p>  查询Erlang是否安装成功: erl -Version</p>
+  <img src="https://raw.githubusercontent.com/liugd2018/img-folder/main/note/rabbitmq/image-20200404191206398.png" alt="image-20200404191206398" style="zoom:50%;" /> 
+
+<ul>
+<li><p>socat安装</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">yum install -y socat</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>rabbitmq安装</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">rpm -ivh rabbitmq-server-3.8.3-1.el7.noarch.rpm</span><br></pre></td></tr></table></figure>
+
+<img src="https://raw.githubusercontent.com/liugd2018/img-folder/main/note/rabbitmq/image-20200404191634289.png" alt="image-20200404191634289" style="zoom:50%;" />
+</li>
+<li><p>激活管理界面</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">rabbitmq-plugins enable rabbitmq_management</span><br></pre></td></tr></table></figure>
+
+<img src="https://raw.githubusercontent.com/liugd2018/img-folder/main/note/rabbitmq/image-20200404192019574.png" alt="image-20200404192019574" style="zoom:50%;" />
+
+</li>
+</ul>
+<h2 id="启动server"><a href="#启动server" class="headerlink" title="启动server"></a>启动server</h2><ul>
+<li><p>启动service</p>
+<p>方法1: </p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">rabbitmq-server</span><br></pre></td></tr></table></figure>
+
+<img src="https://raw.githubusercontent.com/liugd2018/img-folder/main/note/rabbitmq/image-20200404192200959.png" alt="image-20200404192200959" style="zoom:50%;" />
+
+<p>方法2:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl start rabbit-server</span><br></pre></td></tr></table></figure>
+
+<p>推荐使用第二种方法。</p>
+</li>
+<li><p>停止service</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl stop rabbit-server</span><br></pre></td></tr></table></figure>
+
+
+
+</li>
+</ul>
+<p>##三、遇到坑</p>
+<ul>
+<li><p>启动后使用 rabbitmqctl status 查看状态报错</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Error: unable to perform an operation on node &#39;rabbit@xxxx&#39;. Please see diagnostics information and suggestions below.</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><p>需要在/etc/hosts 文件中添加 </p>
+<p>127.0.0.1 xxxx</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo vim &#x2F;etc&#x2F;hosts</span><br><span class="line">source &#x2F;etc&#x2F;hosts</span><br></pre></td></tr></table></figure>
+
+</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">rabbitmqctl status</span><br></pre></td></tr></table></figure>
+
+<img src="https://raw.githubusercontent.com/liugd2018/img-folder/main/note/rabbitmq/image-20200404193134891.png" alt="image-20200404193134891" style="zoom:50%;" />
+
+
+
+</li>
+</ul>
+<ul>
+<li><p>安装的Erlang的版本不对</p>
+<p>因为RabbitMQ-Server的版本要与Erlang的版本对应，你可以对照</p>
+</li>
+</ul>
+<p>  是否正确。</p>
+  <img src="https://raw.githubusercontent.com/liugd2018/img-folder/main/note/rabbitmq/image-20200403181631496.png" alt="image-20200403181631496" style="zoom:50%;" />
+
+
+
+<ul>
+<li><p>rabbitmq远程管理端使用guest用户登陆报错</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">错误: User can only log in via localhost</span><br></pre></td></tr></table></figure>
+
+<p>rabbitmq从3.3.0开始禁止使用guest/guest权限通过除localhost外的访问。</p>
+<p>需要把rabbit.app配置文件中loopback_users设置为[]</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vim &#x2F;usr&#x2F;lib&#x2F;rabbitmq&#x2F;lib&#x2F;rabbitmq_server-3.8.3&#x2F;ebin&#x2F;rabbit.app</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[&#123;rabbit, [&#123;loopback_users, []&#125;]&#125;].</span><br></pre></td></tr></table></figure>
+
+</li>
+</ul>
+</div><div class="tags"><a href="/tags/RabbitMQ/"><i class="fa fa-tag"></i>RabbitMQ</a></div></div></div></div><div class="pure-u-1-4 hidden_mid_and_down"><div id="sidebar"><div class="widget"><form class="search-form" action="//www.google.com/search" method="get" accept-charset="utf-8" target="_blank"><input type="text" name="q" maxlength="20" placeholder="Search"/><input type="hidden" name="sitesearch" value="liugd2018.github.io"/></form></div><div class="widget"><div class="widget-title"><i class="fa fa-folder-o"> 分类</i></div><ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%8A%80%E6%9C%AF/">技术</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-star-o"> 标签</i></div><div class="tagcloud"><a href="/tags/RabbitMQ/" style="font-size: 15px;">RabbitMQ</a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-file-o"> 最近文章</i></div><ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2020/04/04/Centos7.X%E3%80%81Erlang-22.x%E3%80%81RabbitMQ3.8.3%E5%8D%95%E6%9C%BA%E5%AE%89%E8%A3%85/">Centos7.X、Erlang-22.x、RabbitMQ3.8.3单机安装</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-external-link"> 友情链接</i></div></div></div></div><div class="pure-u-1 pure-u-md-3-4"><div id="footer">Copyright © 2020 <a href="/." rel="nofollow">随心所欲.</a> Powered by<a rel="nofollow" target="_blank" href="https://hexo.io"> Hexo.</a><a rel="nofollow" target="_blank" href="https://github.com/tufu9441/maupassant-hexo"> Theme</a> by<a rel="nofollow" target="_blank" href="https://github.com/pagecho"> Cho.</a></div></div></div><a class="show" id="rocket" href="#top"></a><script type="text/javascript" src="/js/totop.js?v=0.0.0" async></script><script type="text/javascript" src="//cdn.jsdelivr.net/gh/fancyapps/fancybox/dist/jquery.fancybox.min.js" async></script><script type="text/javascript" src="/js/fancybox.js?v=0.0.0" async></script><link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/gh/fancyapps/fancybox/dist/jquery.fancybox.min.css"><script type="text/javascript" src="/js/copycode.js" successtext="复制成功!"></script><link rel="stylesheet" type="text/css" href="/css/copycode.css"><script type="text/javascript" src="/js/codeblock-resizer.js?v=0.0.0"></script><script type="text/javascript" src="/js/smartresize.js?v=0.0.0"></script></div></body></html>
