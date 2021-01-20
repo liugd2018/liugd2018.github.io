@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <title>随心所欲</title>
+  <title>技术博客</title>
   
   
   <link href="liugd2018.github.io/atom.xml" rel="self"/>
   
   <link href="liugd2018.github.io/"/>
-  <updated>2021-01-14T10:51:42.124Z</updated>
+  <updated>2021-01-20T07:07:31.410Z</updated>
   <id>liugd2018.github.io/</id>
   
   <author>
@@ -17,22 +17,27 @@
   <generator uri="https://hexo.io/">Hexo</generator>
   
   <entry>
-    <title></title>
+    <title>pierced钉钉内网穿透，仅支持80/443端口</title>
     <link href="liugd2018.github.io/2021/01/14/pierced%EF%BC%9A%E9%92%89%E9%92%89%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F/"/>
     <id>liugd2018.github.io/2021/01/14/pierced%EF%BC%9A%E9%92%89%E9%92%89%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F/</id>
     <published>2021-01-14T10:51:42.124Z</published>
-    <updated>2021-01-14T10:51:42.124Z</updated>
+    <updated>2021-01-20T07:07:31.410Z</updated>
     
-    <content type="html"><![CDATA[<h1 id="pierced：钉钉内网穿透，仅支持80-443端口"><a href="#pierced：钉钉内网穿透，仅支持80-443端口" class="headerlink" title="pierced：钉钉内网穿透，仅支持80/443端口"></a>pierced：钉钉内网穿透，仅支持80/443端口</h1><p>基于ngrok的，默认配置只支持80/443端口（http/https）</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">git clone https:&#x2F;&#x2F;github.com&#x2F;open-dingtalk&#x2F;pierced.git</span><br><span class="line">cd mac_64</span><br><span class="line">chmod 777 .&#x2F;ding</span><br><span class="line">.&#x2F;ding -config&#x3D;.&#x2F;ding.cfg -subdomain&#x3D;abcde 8080</span><br></pre></td></tr></table></figure><p>-config 内网穿透的配置文件，按命令照示例固定为钉钉提供的./ding.cfg，无需修改</p><p>-subdomain 您需要使用的域名前缀，该前缀将会匹配到“vaiwan.com”前面，例如你的subdomain是abcde，启动工具后会将abcde.vaiwan.com映射到本地。</p><p>端口 您需要代理的本地服务http-server端口，例如你本地端口为8080等</p><p>启动完客户端后，你访问<a href="http://haoduck.vaiwan.com/xxxxx">http://haoduck.vaiwan.com/xxxxx</a> 都会映射到 <a href="http://127.0.0.1:8080/xxxxx">http://127.0.0.1:8080/xxxxx</a></p><p>开源页面：<a href="https://github.com/open-dingtalk/pierced">https://github.com/open-dingtalk/pierced</a></p>]]></content>
+    <content type="html"><![CDATA[<p>基于ngrok的，默认配置只支持80/443端口（http/https）</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">git clone https:&#x2F;&#x2F;github.com&#x2F;open-dingtalk&#x2F;pierced.git</span><br><span class="line">cd mac_64</span><br><span class="line">chmod 777 .&#x2F;ding</span><br><span class="line">.&#x2F;ding -config&#x3D;.&#x2F;ding.cfg -subdomain&#x3D;abcde 8080</span><br></pre></td></tr></table></figure><p>-config 内网穿透的配置文件，按命令照示例固定为钉钉提供的./ding.cfg，无需修改</p><p>-subdomain 您需要使用的域名前缀，该前缀将会匹配到“vaiwan.com”前面，例如你的subdomain是abcde，启动工具后会将abcde.vaiwan.com映射到本地。</p><p>端口 您需要代理的本地服务http-server端口，例如你本地端口为8080等</p><p>启动完客户端后，你访问<a href="http://haoduck.vaiwan.com/xxxxx">http://haoduck.vaiwan.com/xxxxx</a> 都会映射到 <a href="http://127.0.0.1:8080/xxxxx">http://127.0.0.1:8080/xxxxx</a></p><p>开源页面：<a href="https://github.com/open-dingtalk/pierced">https://github.com/open-dingtalk/pierced</a></p>]]></content>
     
     
       
       
-    <summary type="html">&lt;h1 id=&quot;pierced：钉钉内网穿透，仅支持80-443端口&quot;&gt;&lt;a href=&quot;#pierced：钉钉内网穿透，仅支持80-443端口&quot; class=&quot;headerlink&quot; title=&quot;pierced：钉钉内网穿透，仅支持80/443端口&quot;&gt;&lt;/a&gt;pierced：</summary>
+    <summary type="html">&lt;p&gt;基于ngrok的，默认配置只支持80/443端口（http/https）&lt;/p&gt;
+&lt;figure class=&quot;highlight plain&quot;&gt;&lt;table&gt;&lt;tr&gt;&lt;td class=&quot;gutter&quot;&gt;&lt;pre&gt;&lt;span class=&quot;line&quot;&gt;1&lt;/span&gt;&lt;b</summary>
       
     
     
     
+    <category term="工具" scheme="liugd2018.github.io/categories/%E5%B7%A5%E5%85%B7/"/>
+    
+    
+    <category term="内网穿透" scheme="liugd2018.github.io/tags/%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F/"/>
     
   </entry>
   
