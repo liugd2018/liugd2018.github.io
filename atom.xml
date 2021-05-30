@@ -6,7 +6,7 @@
   <link href="liugd2018.github.io/atom.xml" rel="self"/>
   
   <link href="liugd2018.github.io/"/>
-  <updated>2021-03-17T06:00:53.834Z</updated>
+  <updated>2021-05-30T09:12:09.248Z</updated>
   <id>liugd2018.github.io/</id>
   
   <author>
@@ -15,6 +15,54 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Mac 电脑免费音频内录插件 Soundflower 使用方法</title>
+    <link href="liugd2018.github.io/2021/05/30/Mac%20%E7%94%B5%E8%84%91%E5%85%8D%E8%B4%B9%E9%9F%B3%E9%A2%91%E5%86%85%E5%BD%95%E6%8F%92%E4%BB%B6%20Soundflower%20%E4%BD%BF%E7%94%A8%E6%96%B9%E6%B3%95/"/>
+    <id>liugd2018.github.io/2021/05/30/Mac%20%E7%94%B5%E8%84%91%E5%85%8D%E8%B4%B9%E9%9F%B3%E9%A2%91%E5%86%85%E5%BD%95%E6%8F%92%E4%BB%B6%20Soundflower%20%E4%BD%BF%E7%94%A8%E6%96%B9%E6%B3%95/</id>
+    <published>2021-05-30T08:43:50.362Z</published>
+    <updated>2021-05-30T09:12:09.248Z</updated>
+    
+    <content type="html"><![CDATA[<h3 id="Download"><a href="#Download" class="headerlink" title="Download"></a>Download</h3><p><a href="https://github.com/mattingalls/Soundflower/releases/tag/2.0b2">Soundflower下载地址</a></p><h3 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h3><ul><li>打开Soundflower.pkg就可以直接安装，安装过程需要你授权一下文件。</li><li>卸载 直接打开Uninstall Soundflower.scpt文件</li><li>安装成功之后在声音会有Soundflower(2ch),Soundflower(64ch)两个插件。</li></ul><p><img src="https://gitee.com/liugd2018/img-folder/raw/master/mac/soundflower/soundflower-install.jpg" alt="安装"></p><p><img src="https://gitee.com/liugd2018/img-folder/raw/master/mac/soundflower/soundflower-1.jpg"></p><h3 id="卸载"><a href="#卸载" class="headerlink" title="卸载"></a>卸载</h3><p>卸载直接run 一下，描述会有”Done!”提示。</p><p><img src="https://gitee.com/liugd2018/img-folder/raw/master/mac/soundflower/soundflower-uninstall.jpg" alt="卸载"></p><h3 id="使用"><a href="#使用" class="headerlink" title="使用"></a>使用</h3><h4 id="音频-MIDI配置"><a href="#音频-MIDI配置" class="headerlink" title="音频 MIDI配置"></a>音频 MIDI配置</h4><p> 在 应用程序 -&gt; 实用工具 里面找到“音频 MIDI 设置”</p><ol><li>点左下角“+”，新建一个“多输出设备”</li><li>多输出设置-主设备-选择 MacBook Pro扬声器</li><li>勾选右边的“MacBook Pro扬声器”和“Soundflower(64ch)”<ul><li>Soundflower(64ch) 和Soundflower(2ch) 区别，好像是64ch音质比较好。咱们就选择64ch。</li></ul></li></ol><p><img src="https://gitee.com/liugd2018/img-folder/raw/master/mac/soundflower/soundflower-2.jpg"></p><p>配置成功之后，声音多出一个<strong>多输出设备</strong>类型</p><p><img src="https://gitee.com/liugd2018/img-folder/raw/master/mac/soundflower/sundflower-3.jpg"></p><h4 id="OBS录屏"><a href="#OBS录屏" class="headerlink" title="OBS录屏"></a>OBS录屏</h4><p>首先把声音选择<strong>多输出设备</strong></p><p><img src="https://gitee.com/liugd2018/img-folder/raw/master/mac/soundflower/soundflower-4.jpg"></p><p>设置OBS</p><p>首先把麦克风给关掉，然后配置信息 **设置-音频-桌面音频 ** 已禁用改下Soundflower(64ch)</p><p><img src="https://gitee.com/liugd2018/img-folder/raw/master/mac/soundflower/obs-1.jpg"></p><p>接着就可以开始录制mac 内录视频了。</p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;h3 id=&quot;Download&quot;&gt;&lt;a href=&quot;#Download&quot; class=&quot;headerlink&quot; title=&quot;Download&quot;&gt;&lt;/a&gt;Download&lt;/h3&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/mattingalls/Soundf</summary>
+      
+    
+    
+    
+    <category term="工具" scheme="liugd2018.github.io/categories/%E5%B7%A5%E5%85%B7/"/>
+    
+    
+    <category term="mac内录" scheme="liugd2018.github.io/tags/mac%E5%86%85%E5%BD%95/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>lombok 避坑指南</title>
+    <link href="liugd2018.github.io/2021/04/29/lombok-%E9%81%BF%E5%9D%91%E6%8C%87%E5%8D%97/"/>
+    <id>liugd2018.github.io/2021/04/29/lombok-%E9%81%BF%E5%9D%91%E6%8C%87%E5%8D%97/</id>
+    <published>2021-04-29T08:19:48.563Z</published>
+    <updated>2021-05-30T09:13:16.409Z</updated>
+    
+    <content type="html"><![CDATA[<p>尽量不要使用 @Data 注解, 这个注解太全了，不利于维护，除非你知道你在干什么<br>Java 默认机制如果有其他构造器，则不会生成无参构造器，在使用 @AllArgsConstructor 注解时，记得加上 @NoArgsConstructor<br>如果类定义还在变化阶段，不建议使用 @AllArgsConstructor 注解<br>@Setter、@Getter 注解如果需要可以缩小使用范围<br>@ToString 注解默认不会生成父类的信息，如果需要生成需要 @ToString(callSuper = true)<br>@RequiredArgsConstructor 和 @NoArgsConstructor 尽量不要一起使用，无参构造器无法处理 @NonNull，但在序列化/反序列化的还是需要提供无参的<br>当团队决定不再使用 Lombok 的时候，可以使用 Lombok 插件的 Delombok 一键去除，在 Refactor &gt; Delombok 中<br>再次注意- @AllArgsConstructor 尽量不要使用</p>]]></content>
+    
+    
+      
+      
+    <summary type="html">&lt;p&gt;尽量不要使用 @Data 注解, 这个注解太全了，不利于维护，除非你知道你在干什么&lt;br&gt;Java 默认机制如果有其他构造器，则不会生成无参构造器，在使用 @AllArgsConstructor 注解时，记得加上 @NoArgsConstructor&lt;br&gt;如果类定义还在变</summary>
+      
+    
+    
+    
+    <category term="lombok" scheme="liugd2018.github.io/categories/lombok/"/>
+    
+    
+    <category term="lombok" scheme="liugd2018.github.io/tags/lombok/"/>
+    
+  </entry>
   
   <entry>
     <title>Elasticsearch couldn&#39;t validate latitude/ longitude values</title>
