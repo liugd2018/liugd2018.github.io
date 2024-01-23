@@ -1,0 +1,192 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="description" content=""><title>MySQL 实战45讲-05-锁 | Programming Notes</title><link rel="stylesheet" type="text/css" href="/css/style.css?v=1.0.0"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/normalize/latest/normalize.min.css"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/pure/latest/pure-min.min.css"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/pure/latest/grids-responsive-min.min.css"><link rel="stylesheet" href="//lib.baomitu.com/font-awesome/4.7.0/css/font-awesome.min.css"><script type="text/javascript" src="//lib.baomitu.com/jquery/latest/jquery.min.js"></script><link rel="icon" mask="" sizes="any" href="/favicon.ico"><link rel="Shortcut Icon" type="image/x-icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png"><script type="text/javascript" src="//lib.baomitu.com/clipboard.js/latest/clipboard.min.js"></script><script type="text/javascript" src="//lib.baomitu.com/toastr.js/latest/toastr.min.js"></script><link rel="stylesheet" href="//lib.baomitu.com/toastr.js/latest/toastr.min.css"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="body_container"><div id="header"><div class="site-name"><h1 class="hidden">MySQL 实战45讲-05-锁</h1><a id="logo" href="/.">Programming Notes</a><p class="description"></p></div><div id="nav-menu"><a class="current" href="/."><i class="fa fa-home"> 首页</i></a><a href="/archives/"><i class="fa fa-archive"> 归档</i></a><a href="/about/"><i class="fa fa-user"> 关于</i></a><a href="/atom.xml"><i class="fa fa-rss"> 订阅</i></a></div></div><div class="pure-g" id="layout"><div class="pure-u-1 pure-u-md-3-4"><div class="content_container"><div class="post"><h1 class="post-title">MySQL 实战45讲-05-锁</h1><div class="post-meta">2024-01-23<span> | </span><span class="category"><a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></span></div><div class="post-content"><p><strong>根据加锁的范围，MySQL 里面的锁大致可以分成全局锁、表级锁和行锁三类</strong>。</p>
+<h3 id="全局锁"><a href="#全局锁" class="headerlink" title="全局锁"></a>全局锁</h3><p>全局锁:就是对整个数据库加锁。<strong>全局锁的典型使用场景是，做全库逻辑备份。</strong></p>
+<p><strong>不带事务</strong></p>
+<p>MySQL 提供了一个加全局读锁的方法，命令是Flush tables with read lock (FTWRL)。当你需要让整个库处于只读状态的时候，可以使用这个命令，之后其他线程的以下语句会被阻塞。</p>
+<p>FTWRL: 只适用于不支持事务的引擎。</p>
+<p>通过FTWRL 方式锁库出现的问题:</p>
+<ul>
+<li>如果你在主库上备份，那么在备份期间都不能执行更新，业务基本上就得停摆；</li>
+<li>如果你在从库上备份，那么备份期间从库不能执行主库同步过来的 binlog，会导致主从延迟。</li>
+</ul>
+<p><strong>InnoDB</strong></p>
+<p>官方自带的逻辑备份工具是 mysqldump。当 mysqldump 使用参数–single-transaction 的时候，导数据之前就会启动一个事务，来确保拿到一致性视图。而由于 MVCC 的支持，这个过程中数据是可以正常更新的。<strong>single-transaction 方法只适用于所有的表使用事务引擎的库。</strong></p>
+<p><strong>既然要全库只读，为什么不使用 set global readonly&#x3D;true 的方式呢</strong>？</p>
+<p>确实readonly 方式也可以让全库进入只读状态，但我还是会建议你用 FTWRL 方式。</p>
+<ul>
+<li>有些系统readonly值是被使用与其他逻辑，比如判断是不是主从库。修改 global 变量的方式影响面更大</li>
+<li>在异常处理机制上有差异。如果执行 FTWRL 命令之后由于客户端发生异常断开，那么 MySQL 会自动释放这个全局锁，整个库回到可以正常更新的状态。而将整个库设置为readonly 之后，如果客户端发生异常，则数据库就会一直保持 readonly 状态，这样会导致整个库长时间处于不可写状态，风险较高。</li>
+</ul>
+<h3 id="表级锁"><a href="#表级锁" class="headerlink" title="表级锁"></a>表级锁</h3><p>MySQL 里面表级别的锁有两种：一种是表锁，一种是元数据锁（meta data lock，MDL)。表锁一般是在数据库引擎不支持行锁的时候才会被用到的。</p>
+<p><strong>表锁的语法是 lock tables … read&#x2F;write。</strong>与 FTWRL 类似，可以用 unlock tables 主动释放锁，也可以在客户端断开的时候自动释放。需要注意，lock tables 语法除了会限制别的线程的读写外，也限定了本线程接下来的操作对象。</p>
+<p><strong>另一类表级的锁是 MDL（metadata lock)。</strong>MDL 不需要显式使用，在访问一个表的时候会被自动加上。MDL 的作用是，保证读写的正确性。</p>
+<p>因此，在 MySQL 5.5 版本中引入了 MDL，当对一个表做增删改查操作的时候，加 MDL 读锁；当要对表做结构变更操作的时候，加 MDL 写锁。</p>
+<ul>
+<li>读锁之间不互斥，因此你可以有多个线程同时对一张表增删改查。</li>
+<li>读写锁之间，写锁之间是互斥的，用来保证变更表结构操作的安全性。因此，如果有两个线程要同时给一个表加字段，其中一个要等另一个执行完才能开始执行。</li>
+</ul>
+<p><strong>坑注意一下</strong></p>
+<p>加上MDL写锁之后，然后后面MDL读锁也要被阻塞。如果MDL写锁一直被阻塞，导致后面的增删查改都会被阻塞。</p>
+<p>解决方案:</p>
+<p>在修改表DDL NOWAIT&#x2F;WAIT n 这个语法。加上超时时间或者，不去堵塞。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> tbl_name NOWAIT <span class="keyword">add</span> <span class="keyword">column</span> ...</span><br><span class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> tbl_name WAIT N <span class="keyword">add</span> <span class="keyword">column</span> ...</span><br></pre></td></tr></table></figure>
+
+
+
+<h3 id="行锁"><a href="#行锁" class="headerlink" title="行锁"></a>行锁</h3><p>MySQL 的行锁是在引擎层由各个引擎自己实现的。但并不是所有的引擎都支持行锁，比如MyISAM 引擎就不支持行锁。</p>
+<p><strong>行锁就是减少锁冲突来提升业务并发度。</strong></p>
+<p><strong>两阶段锁</strong></p>
+<p><strong>在 InnoDB 事务中，行锁是在需要的时候才加上的，但并不是不需要了就立刻释放，而是要等到事务结束时才释放。这个就是两阶段锁协议。</strong></p>
+<p>如果你的事务中需要锁多个行，要把最可能造成锁冲突、最可能影响并发度的锁尽量往后放。</p>
+<p><strong>死锁和死锁检测</strong></p>
+<p>当并发系统中不同线程出现循环资源依赖，涉及的线程都在等待别的线程释放资源时，就会导致这几个线程都进入无限等待的状态，称为死锁。</p>
+<p>当出现死锁以后，有两种策略：</p>
+<ul>
+<li>一种策略是，直接进入等待，直到超时。这个超时时间可以通过参数innodb_lock_wait_timeout 来设置。<ul>
+<li>在 InnoDB 中，innodb_lock_wait_timeout 的默认值是 50s，如果把这个超时时间改的很小就会出现误伤。</li>
+</ul>
+</li>
+<li>另一种策略是，发起死锁检测，发现死锁后，主动回滚死锁链条中的某一个事务，让其他事务得以继续执行。将参数 innodb_deadlock_detect 设置为 on，表示开启这个逻辑。<ul>
+<li>innodb_deadlock_detect 的默认值本身就是 on。就是死锁检索也有性能消耗，会耗费大量的CPU资源。</li>
+</ul>
+</li>
+</ul>
+<p><strong>怎么解决由这种热点行更新导致的性能问题呢？</strong></p>
+<ul>
+<li>如果你保证这个一定不会出现死锁，就把死锁检测给关掉</li>
+<li>控制并发度，减少并发。</li>
+<li>业务层面，把一条并发热点数据拆分成10份，这样就会把死锁的概率降低1&#x2F;10。也就减少了死锁检测的 CPU 消耗</li>
+</ul>
+<h3 id="间隙锁"><a href="#间隙锁" class="headerlink" title="间隙锁"></a>间隙锁</h3><p>为了解决幻读问题，InnoDB 只好引入新的锁，也就是间隙锁 (Gap Lock)。</p>
+<p>间隙锁是在<strong>可重复读,序列化隔离级别</strong>下才会生效的。所以，你如果把隔离级别设置为读提交的话，就没有间隙锁了。但同时，你要解决可能出现的数据和日志不一致问题，需要把 binlog 格式设置为 row。</p>
+<p>今天和你分析的问题都是在可重复读隔离级别下的，间隙锁是在可重复读隔离级别下才会生效的。所以，你如果把隔离级别设置为读提交的话，就没有间隙锁了。但同时，你要解决可能出现的数据和日志不一致问题，需要把 binlog 格式设置为 row。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> `t` (</span><br><span class="line"> `id` <span class="type">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="keyword">NULL</span>,</span><br><span class="line"> `c` <span class="type">int</span>(<span class="number">11</span>) <span class="keyword">DEFAULT</span> <span class="keyword">NULL</span>,</span><br><span class="line"> `d` <span class="type">int</span>(<span class="number">11</span>) <span class="keyword">DEFAULT</span> <span class="keyword">NULL</span>,</span><br><span class="line"> <span class="keyword">PRIMARY</span> KEY (`id`),</span><br><span class="line"> KEY `c` (`c`)</span><br><span class="line">) ENGINE<span class="operator">=</span>InnoDB;</span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> t <span class="keyword">values</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>),(<span class="number">5</span>,<span class="number">5</span>,<span class="number">5</span>),</span><br><span class="line">(<span class="number">10</span>,<span class="number">10</span>,<span class="number">10</span>),(<span class="number">15</span>,<span class="number">15</span>,<span class="number">15</span>),(<span class="number">20</span>,<span class="number">20</span>,<span class="number">20</span>),(<span class="number">25</span>,<span class="number">25</span>,<span class="number">25</span>);</span><br></pre></td></tr></table></figure>
+
+
+
+<p>顾名思义，间隙锁，锁的就是两个值之间的空隙。比如文章开头的表 t，初始化插入了 6 个记录，这就产生了 7 个间隙。</p>
+<p>这样，当你执行 select * from t where d&#x3D;5 for update 的时候，就不止是给数据库中已有的 6个记录加上了行锁，还同时加了 7 个间隙锁。这样就确保了无法再插入新的记录。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8101.png"></p>
+<p>在一行行扫描的过程中，不仅将给行加上了行锁，还给行两边的空隙，也加上了间隙锁。</p>
+<p><strong>跟间隙锁存在冲突关系的，是“往这个间隙中插入一个记录”这个操作。</strong>间隙锁之间都不存在冲突关系。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8102.png"></p>
+<p>这里 session B 并不会被堵住。因为表 t 里并没有 c&#x3D;7 这个记录，因此 session A 加的是间隙锁 (5,10)。而 session B 也是在这个间隙加的间隙锁。它们有共同的目标，即：保护这个间隙，不允许插入值。但，它们之间是不冲突的。间隙锁和行锁合称 next-key lock，每个 next-key lock 是前开后闭区间。也就是说，我们的表t 初始化以后，如果用 select * from t for update 要把整个表所有记录锁起来，就形成了 7 个next-key lock，分别是 (-∞,0]、(0,5]、(5,10]、(10,15]、(15,20]、(20, 25]、(25, +suprenum]。</p>
+<p>间隙锁和行锁合称 next-key lock，每个 next-key lock 是前开后闭区间。把间隙锁记为开区间，把 next-key lock 记为前开后闭区间。</p>
+<p><strong>死锁的案例</strong></p>
+<p>业务逻辑这样的：任意锁住一行，如果这一行不存在的话就插入，如果存在这一行就更新</p>
+<p>它的数据，代码如下：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">begin</span>;</span><br><span class="line"><span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> t <span class="keyword">where</span> id<span class="operator">=</span>N <span class="keyword">for</span> <span class="keyword">update</span>;</span><br><span class="line"><span class="comment">/* 如果行不存在 */</span></span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> t <span class="keyword">values</span>(N,N,N);</span><br><span class="line"><span class="comment">/* 如果行存在 */</span></span><br><span class="line"><span class="keyword">update</span> t <span class="keyword">set</span> d<span class="operator">=</span>N <span class="keyword">set</span> id<span class="operator">=</span>N;</span><br><span class="line"><span class="keyword">commit</span>;</span><br></pre></td></tr></table></figure>
+
+<p>可能你会说，这个不是 insert … on duplicate key update 就能解决吗？但其实在有多个唯一键的时候，这个方法是不能满足这位提问同学的需求的。至于为什么，我会在后面的文章中再展开说明。</p>
+<p>这个逻辑一旦有并发，就会碰到死锁。你一定也觉得奇怪，这个逻辑每次操作前用 for update 锁起来，已经是最严格的模式了，怎么还会有死锁呢？</p>
+<p>这里，我用两个 session 来模拟并发，并假设 N&#x3D;9。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8103.png"></p>
+<p>你看到了，其实都不需要用到后面的 update 语句，就已经形成死锁了。我们按语句执行顺序来分析一下：</p>
+<ol>
+<li>session A 执行 select … for update 语句，由于 id&#x3D;9 这一行并不存在，因此会加上间隙锁 (5,10);</li>
+<li>session B 执行 select … for update 语句，同样会加上间隙锁 (5,10)，间隙锁之间不会冲突，因此这个语句可以执行成功；</li>
+<li>session B 试图插入一行 (9,9,9)，被 session A 的间隙锁挡住了，只好进入等待；</li>
+<li>session A 试图插入一行 (9,9,9)，被 session B 的间隙锁挡住了。</li>
+</ol>
+<p>至此，两个 session 进入互相等待状态，形成死锁。当然，InnoDB 的死锁检测马上就发现了这对死锁关系，让 session A 的 insert 语句报错返回了。</p>
+<p>你现在知道了，<strong>间隙锁的引入，可能会导致同样的语句锁住更大的范围，这其实是影响了并发度的</strong>。</p>
+<h5 id="加锁规则"><a href="#加锁规则" class="headerlink" title="加锁规则"></a>加锁规则</h5><p>MySQL 后面的版本可能会改变加锁策略，所以这个规则只限于截止到现在的最新版本，即5.x 系列 &lt;&#x3D;5.7.24，8.0 系列 &lt;&#x3D;8.0.13。</p>
+<p><strong>加锁规则里面，包含了两个“原则”、两个“优化”和一个“bug”。</strong></p>
+<ol>
+<li>原则 1：加锁的基本单位是 next-key lock。希望你还记得，next-key lock 是前开后闭区间。</li>
+<li>原则 2：查找过程中访问到的对象才会加锁。</li>
+<li>优化 1：索引上的等值查询，给唯一索引加锁的时候，next-key lock 退化为行锁。</li>
+<li>优化 2：索引上的等值查询，向右遍历时且最后一个值不满足等值条件的时候，next-key lock 退化为间隙锁。</li>
+<li>一个 bug：唯一索引上的范围查询会访问到不满足条件的第一个值为止。</li>
+</ol>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE</span> <span class="keyword">TABLE</span> `t` (</span><br><span class="line"> `id` <span class="type">int</span>(<span class="number">11</span>) <span class="keyword">NOT</span> <span class="keyword">NULL</span>,</span><br><span class="line"> `c` <span class="type">int</span>(<span class="number">11</span>) <span class="keyword">DEFAULT</span> <span class="keyword">NULL</span>,</span><br><span class="line"> `d` <span class="type">int</span>(<span class="number">11</span>) <span class="keyword">DEFAULT</span> <span class="keyword">NULL</span>,</span><br><span class="line"> <span class="keyword">PRIMARY</span> KEY (`id`),</span><br><span class="line"> KEY `c` (`c`)</span><br><span class="line">) ENGINE<span class="operator">=</span>InnoDB;</span><br><span class="line"><span class="keyword">insert</span> <span class="keyword">into</span> t <span class="keyword">values</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>),(<span class="number">5</span>,<span class="number">5</span>,<span class="number">5</span>),</span><br><span class="line">(<span class="number">10</span>,<span class="number">10</span>,<span class="number">10</span>),(<span class="number">15</span>,<span class="number">15</span>,<span class="number">15</span>),(<span class="number">20</span>,<span class="number">20</span>,<span class="number">20</span>),(<span class="number">25</span>,<span class="number">25</span>,<span class="number">25</span>);</span><br></pre></td></tr></table></figure>
+
+
+
+<p><strong>案例一：等值查询间隙锁</strong></p>
+<p>第一个例子是关于等值条件操作间隙：</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8104.png"></p>
+<p>由于表 t 中没有 id&#x3D;7 的记录，所以用我们上面提到的加锁规则判断一下的话：</p>
+<ol>
+<li>根据原则 1，加锁单位是 next-key lock，session A 加锁范围就是 (5,10]；</li>
+<li>同时根据优化 2，这是一个等值查询 (id&#x3D;7)，而 id&#x3D;10 不满足查询条件，next-key lock退化成间隙锁，因此最终加锁的范围是 (5,10)。</li>
+</ol>
+<p>所以，session B 要往这个间隙里面插入 id&#x3D;8 的记录会被锁住，但是 session C 修改 id&#x3D;10 这行是可以的。</p>
+<p><strong>案例二：非唯一索引等值锁</strong></p>
+<p>第二个例子是关于覆盖索引上的锁：</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8105.png"></p>
+<p>这里 session A 要给索引 c 上 c&#x3D;5 的这一行加上读锁。</p>
+<ol>
+<li>根据原则 1，加锁单位是 next-key lock，因此会给 (0,5] 加上 next-key lock。</li>
+<li>要注意 c 是普通索引，因此仅访问 c&#x3D;5 这一条记录是不能马上停下来的，需要向右遍历，查到 c&#x3D;10 才放弃。根据原则 2，访问到的都要加锁，因此要给 (5,10] 加 next-key lock。</li>
+<li>但是同时这个符合优化 2：等值判断，向右遍历，最后一个值不满足 c&#x3D;5 这个等值条件，因此退化成间隙锁 (5,10)。</li>
+<li>根据原则 2 ，<strong>只有访问到的对象才会加锁</strong>，这个查询使用覆盖索引，并不需要访问主键索引，所以主键索引上没有加任何锁，这就是为什么 session B 的 update 语句可以执行完成。</li>
+</ol>
+<p>但 session C 要插入一个 (7,7,7) 的记录，就会被 session A 的间隙锁 (5,10) 锁住。</p>
+<p>需要注意，在这个例子中，lock in share mode 只锁覆盖索引，但是如果是 for update 就不一样了。 执行 for update 时，系统会认为你接下来要更新数据，因此会顺便给主键索引上满足条件的行加上行锁。</p>
+<p>这个例子说明，锁是加在索引上的；同时，它给我们的指导是，如果你要用 lock in sharemode 来给行加读锁避免数据被更新的话，就必须得绕过覆盖索引的优化，在查询字段中加入索引中不存在的字段。比如，将 session A 的查询语句改成 select d from t where c&#x3D;5 lock in share mode。你可以自己验证一下效果。</p>
+<p><strong>案例三：主键索引范围锁</strong></p>
+<p>第三个例子是关于范围查询的。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8106.png"></p>
+<p>现在我们就用前面提到的加锁规则，来分析一下 session A 会加什么锁呢？</p>
+<ol>
+<li>开始执行的时候，要找到第一个 id&#x3D;10 的行，因此本该是 next-key lock(5,10]。 根据优化1， 主键 id 上的等值条件，退化成行锁，只加了 id&#x3D;10 这一行的行锁。</li>
+<li>范围查找就往后继续找，找到 id&#x3D;15 这一行停下来，因此需要加 next-key lock(10,15]。</li>
+</ol>
+<p>所以，session A 这时候锁的范围就是主键索引上，行锁 id&#x3D;10 和 next-key lock(10,15]。这样，session B 和 session C 的结果你就能理解了。</p>
+<p>这里你需要注意一点，首次 session A 定位查找 id&#x3D;10 的行的时候，是当做等值查询来判断的，而向右扫描到 id&#x3D;15 的时候，用的是范围查询判断。</p>
+<p><strong>案例四：非唯一索引范围锁</strong></p>
+<p>接下来，我们再看两个范围查询加锁的例子，你可以对照着案例三来看。</p>
+<p>需要注意的是，与案例三不同的是，案例四中查询语句的 where 部分用的是字段 c。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8107.png"></p>
+<p>这次 session A 用字段 c 来判断，加锁规则跟案例三唯一的不同是：在第一次用 c&#x3D;10 定位记录的时候，索引 c 上加了 (5,10] 这个 next-key lock 后，由于索引 c 是非唯一索引，没有优化规则，也就是说不会蜕变为行锁，因此最终 sesion A 加的锁是，索引 c 上的 (5,10] 和 (10,15]这两个 next-key lock。</p>
+<p>所以从结果上来看，sesson B 要插入（8,8,8) 的这个 insert 语句时就被堵住了。</p>
+<p>这里需要扫描到 c&#x3D;15 才停止扫描，是合理的，因为 InnoDB 要扫到 c&#x3D;15，才知道不需要继续往后找了。</p>
+<p><strong>案例五：唯一索引范围锁</strong> <strong>bug</strong></p>
+<p>前面的四个案例，我们已经用到了加锁规则中的两个原则和两个优化，接下来再看一个关于加锁规则中 bug 的案例。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8108.png"></p>
+<p>session A 是一个范围查询，按照原则 1 的话，应该是索引 id 上只加 (10,15] 这个 next-key lock，并且因为 id 是唯一键，所以循环判断到 id&#x3D;15 这一行就应该停止了。</p>
+<p>但是实现上，InnoDB 会往前扫描到第一个不满足条件的行为止，也就是 id&#x3D;20。而且由于这是个范围扫描，因此索引 id 上的 (15,20] 这个 next-key lock 也会被锁上。</p>
+<p>所以你看到了，session B 要更新 id&#x3D;20 这一行，是会被锁住的。同样地，session C 要插入id&#x3D;16 的一行，也会被锁住。</p>
+<p>照理说，这里锁住 id&#x3D;20 这一行的行为，其实是没有必要的。因为扫描到 id&#x3D;15，就可以确定不用往后再找了。但实现上还是这么做了，因此我认为这是个 bug。我也曾找社区的专家讨论过，官方 bug 系统上也有提到，但是并未被 verified。所以，认为这是 bug 这个事儿，也只能算我的一家之言，如果你有其他见解的话，也欢迎你提出来。</p>
+<p><strong>案例六：非唯一索引上存在“等值”的例子</strong></p>
+<p>接下来的例子，是为了更好地说明“间隙”这个概念。这里，我给表 t 插入一条新记录。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">insert</span> <span class="keyword">into</span> t <span class="keyword">values</span>(<span class="number">30</span>,<span class="number">10</span>,<span class="number">30</span>);</span><br></pre></td></tr></table></figure>
+
+<p>新插入的这一行 c&#x3D;10，也就是说现在表里有两个 c&#x3D;10 的行。那么，这时候索引 c 上的间隙是什么状态了呢？你要知道，由于非唯一索引上包含主键的值，所以是不可能存在“相同”的两行的。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8109.png"></p>
+<p>可以看到，虽然有两个 c&#x3D;10，但是它们的主键值 id 是不同的（分别是 10 和 30），因此这两个 c&#x3D;10 的记录之间，也是有间隙的。</p>
+<p>图中我画出了索引 c 上的主键 id。为了跟间隙锁的开区间形式进行区别，我用 (c&#x3D;10,id&#x3D;30) 这样的形式，来表示索引上的一行。</p>
+<p>现在，我们来看一下案例六。</p>
+<p>这次我们用 delete 语句来验证。注意，delete 语句加锁的逻辑，其实跟 select … for update是类似的，也就是我在文章开始总结的两个“原则”、两个“优化”和一个“bug”。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8110.png"></p>
+<p>这时，session A 在遍历的时候，先访问第一个 c&#x3D;10 的记录。同样地，根据原则 1，这里加的是 (c&#x3D;5,id&#x3D;5) 到 (c&#x3D;10,id&#x3D;10) 这个 next-key lock。然后，session A 向右查找，直到碰到 (c&#x3D;15,id&#x3D;15) 这一行，循环才结束。根据优化 2，这是一个等值查询，向右查找到了不满足条件的行，所以会退化成 (c&#x3D;10,id&#x3D;10) 到 (c&#x3D;15,id&#x3D;15)的间隙锁。</p>
+<p>也就是说，这个 delete 语句在索引 c 上的加锁范围，就是下图中蓝色区域覆盖的部分。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8111.png"></p>
+<p>这个蓝色区域左右两边都是虚线，表示开区间，即 (c&#x3D;5,id&#x3D;5) 和 (c&#x3D;15,id&#x3D;15) 这两行上都没有锁。</p>
+<p><strong>案例七：limit 语句加锁</strong></p>
+<p>例子 6 也有一个对照案例，场景如下所示：</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8113.png"></p>
+<p>这个例子里，session A 的 delete 语句加了 limit 2。你知道表 t 里 c&#x3D;10 的记录其实只有两条，因此加不加 limit 2，删除的效果都是一样的，但是加锁的效果却不同。可以看到，session B 的 insert 语句执行通过了，跟案例六的结果不同。</p>
+<p>这是因为，案例七里的 delete 语句明确加了 limit 2 的限制，因此在遍历到 (c&#x3D;10, id&#x3D;30) 这一行之后，满足条件的语句已经有两条，循环就结束了。</p>
+<p>因此，索引 c 上的加锁范围就变成了从（c&#x3D;5,id&#x3D;5) 到（c&#x3D;10,id&#x3D;30) 这个前开后闭区间，如下图所示：</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8114.png"></p>
+<p>可以看到，(c&#x3D;10,id&#x3D;30）之后的这个间隙并没有在加锁范围里，因此 insert 语句插入 c&#x3D;12是可以执行成功的。</p>
+<p>这个例子对我们实践的指导意义就是，<strong>在删除数据的时候尽量加 limit</strong>。这样不仅可以控制删除数据的条数，让操作更安全，还可以减小加锁的范围。</p>
+<p><strong>案例八：一个死锁的例子</strong></p>
+<p>前面的例子中，我们在分析的时候，是按照 next-key lock 的逻辑来分析的，因为这样分析比较方便。最后我们再看一个案例，目的是说明：next-key lock 实际上是间隙锁和行锁加起来的结果。</p>
+<p>你一定会疑惑，这个概念不是一开始就说了吗？不要着急，我们先来看下面这个例子：</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql-45%E8%AE%B2-%E9%97%B4%E9%9A%99%E9%94%8115.png"></p>
+<p>现在，我们按时间顺序来分析一下为什么是这样的结果。</p>
+<ol>
+<li>session A 启动事务后执行查询语句加 lock in share mode，在索引 c 上加了 next-keylock(5,10] 和间隙锁 (10,15)；</li>
+<li>session B 的 update 语句也要在索引 c 上加 next-key lock(5,10] ，进入锁等待；</li>
+<li>然后 session A 要再插入 (8,8,8) 这一行，被 session B 的间隙锁锁住。由于出现了死锁，InnoDB 让 session B 回滚。</li>
+</ol>
+<p>你可能会问，session B 的 next-key lock 不是还没申请成功吗？其实是这样的，session B 的“加 next-key lock(5,10] ”操作，实际上分成了两步，先是加(5,10) 的间隙锁，加锁成功；然后加 c&#x3D;10 的行锁，这时候才被锁住的。也就是说，我们在分析加锁规则的时候可以用 next-key lock 来分析。但是要知道，具体执行的时候，是要分成间隙锁和行锁两段来执行的。</p>
+<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><p>我们上面的所有案例都是在可重复读隔离级别 (repeatable-read) 下验证的。同时，可重复读隔离级别遵守两阶段锁协议，所有加锁的资源，都是在事务提交或者回滚的时候才释放的。</p>
+<p>在最后的案例中，你可以清楚地知道 next-key lock 实际上是由间隙锁加行锁实现的。如果切换到读提交隔离级别 (read-committed) 的话，就好理解了，过程中去掉间隙锁的部分，也就是只剩下行锁的部分。</p>
+<p>其实读提交隔离级别在外键场景下还是有间隙锁，相对比较复杂，我们今天先不展开。</p>
+<p>另外，在读提交隔离级别下还有一个优化，即：语句执行过程中加上的行锁，在语句执行完成后，就要把“不满足条件的行”上的行锁直接释放了，不需要等到事务提交。</p>
+<p>也就是说，读提交隔离级别下，锁的范围更小，锁的时间更短，这也是不少业务都默认使用读提交隔离级别的原因。</p>
+<p>在业务需要使用可重复读隔离级别的时候，能够更细致地设计操作数据库的语句，解决幻读问题的同时，最大限度地提升系统并行处理事务的能力。</p>
+</div><div class="tags"><ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/MYSQL%E5%AE%9E%E6%88%9845%E8%AE%B2%E7%AC%94%E8%AE%B0/" rel="tag">MYSQL实战45讲笔记</a></li></ul></div><div class="post-nav"><a class="pre" href="/2024/01/23/MYSQL/MySQL-%E5%AE%9E%E6%88%9845%E8%AE%B2-06-%E6%95%B0%E6%8D%AE%E8%84%8F%E9%A1%B5%E5%88%B7%E6%96%B0/">MySQL-实战45讲-06-数据脏页刷新</a><a class="next" href="/2024/01/23/MYSQL/MySQL-%E5%AE%9E%E6%88%9845%E8%AE%B2-03-%E4%BA%8B%E7%89%A9%E9%9A%94%E7%A6%BB/">MySQL 实战45讲-03-事物隔离级别</a></div></div></div></div><div class="pure-u-1-4 hidden_mid_and_down"><div id="sidebar"><div class="widget"><form class="search-form" action="//www.google.com/search" method="get" accept-charset="utf-8" target="_blank"><input type="text" name="q" maxlength="20" placeholder="Search"/><input type="hidden" name="sitesearch" value="http://liugd2018.github.io"/></form></div><div class="widget"><form class="search-form" action="//www.baidu.com/baidu" method="get" accept-charset="utf-8" target="_blank"><input type="search" name="word" maxlength="20" placeholder="Search"/><input type="hidden" name="si" value="http://liugd2018.github.io"/><input name="tn" type="hidden" value="bds"/><input name="cl" type="hidden" value="3"/><input name="ct" type="hidden" value="2097152"/><input name="s" type="hidden" value="on"/></form></div><div class="widget"><div class="author-info"><a class="info-avatar" href="/about/" title="关于"><img class="nofancybox" src="/img/avatar.png"/></a><p>To be a better man.</p><a class="info-icon" href="mailto:liugd2020@gmail.com" title="Email" target="_blank" style="margin-inline:5px"> <i class="fa fa-envelope-square" style="margin-inline:5px"></i></a><a class="info-icon" href="https://github.com/liugd2018" title="Github" target="_blank" style="margin-inline:5px"> <i class="fa fa-github-square" style="margin-inline:5px"></i></a><a class="info-icon" href="/atom.xml" title="RSS" target="_blank" style="margin-inline:5px"> <i class="fa fa-rss-square" style="margin-inline:5px"></i></a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-folder-o"> 分类</i></div><ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Elasticsearch/">Elasticsearch</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/IDEA/">IDEA</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/JAVA/">JAVA</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/LIUNX/">LIUNX</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Redis/">Redis</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Spring/">Spring</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/kubernetes/">kubernetes</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/leetcode/">leetcode</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/lombok/">lombok</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/mongoDB/">mongoDB</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/openvpn/">openvpn</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E4%B8%80%E5%85%A5java%E6%B7%B1%E4%BC%BC%E6%B5%B7/">一入java深似海</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%8E%8B%E6%B5%8B/">压测</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8/">安卓模拟器</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%AE%B9%E5%99%A8/">容器</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%B0%8F%E9%A9%AC%E5%93%A5java%E8%BF%9B%E9%98%B6%E8%AE%AD%E7%BB%83%E8%90%A5/">小马哥java进阶训练营</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%B7%A5%E5%85%B7/">工具</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/">操作系统</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/">数据结构</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/">数据结构与算法之美</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E7%BC%96%E7%A8%8B%E6%8A%80%E6%9C%AF/">编程技术</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E8%99%9A%E6%8B%9F%E5%8C%96/">虚拟化</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-star-o"> 标签</i></div><div class="tagcloud"><a href="/tags/Elasticsearch/" style="font-size: 15px;">Elasticsearch</a> <a href="/tags/IDEA/" style="font-size: 15px;">IDEA</a> <a href="/tags/lombok/" style="font-size: 15px;">lombok</a> <a href="/tags/Java/" style="font-size: 15px;">Java</a> <a href="/tags/JAVA/" style="font-size: 15px;">JAVA</a> <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" style="font-size: 15px;">数据结构</a> <a href="/tags/mac%E5%86%85%E5%BD%95/" style="font-size: 15px;">mac内录</a> <a href="/tags/%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F/" style="font-size: 15px;">内网穿透</a> <a href="/tags/MYSQL/" style="font-size: 15px;">MYSQL</a> <a href="/tags/MYSQL%E5%AE%9E%E6%88%9845%E8%AE%B2%E7%AC%94%E8%AE%B0/" style="font-size: 15px;">MYSQL实战45讲笔记</a> <a href="/tags/Hyper-V/" style="font-size: 15px;">Hyper-V</a> <a href="/tags/k8s%E5%8E%8B%E6%B5%8B/" style="font-size: 15px;">k8s压测</a> <a href="/tags/%E6%95%B0%E7%BB%84/" style="font-size: 15px;">数组</a> <a href="/tags/%E9%93%BE%E8%A1%A8/" style="font-size: 15px;">链表</a> <a href="/tags/kubernetes/" style="font-size: 15px;">kubernetes</a> <a href="/tags/LIUNX/" style="font-size: 15px;">LIUNX</a> <a href="/tags/mongoDB/" style="font-size: 15px;">mongoDB</a> <a href="/tags/Redis/" style="font-size: 15px;">Redis</a> <a href="/tags/%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8/" style="font-size: 15px;">安卓模拟器</a> <a href="/tags/openvpn/" style="font-size: 15px;">openvpn</a> <a href="/tags/Docker/" style="font-size: 15px;">Docker</a> <a href="/tags/Containerd/" style="font-size: 15px;">Containerd</a> <a href="/tags/%E7%AC%94%E8%AE%B0/" style="font-size: 15px;">笔记</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 15px;">操作系统</a> <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/" style="font-size: 15px;">数据结构与算法之美</a> <a href="/tags/RabbitMQ/" style="font-size: 15px;">RabbitMQ</a> <a href="/tags/Spring-Cloud/" style="font-size: 15px;">Spring Cloud</a> <a href="/tags/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98/" style="font-size: 15px;">线上问题</a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-file-o"> 最近文章</i></div><ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/MYSQL/%E7%BA%BF%E4%B8%8A%E6%95%B0%E6%8D%AE%E5%BA%93%E5%A0%B5%E5%A1%9E/">线上数据库连接数爆满导致堵塞</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E7%BE%8E/%E7%AE%97%E6%B3%95%E9%A6%96%E9%A1%B5-01/">数据结构和算法分类</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E5%AE%B9%E5%99%A8/Docker%E5%9F%BA%E7%A1%80/">Docker基础</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E5%AE%B9%E5%99%A8/Containerd-%E6%90%AD%E5%BB%BA%E4%BB%A5%E5%8F%8A%E4%BD%BF%E7%94%A8/">Containerd 搭建以及使用</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/byte%E4%B8%80%E4%B8%AA%E5%AD%97%E8%8A%82%E7%9A%84%E6%95%B0%E6%8D%AE%E5%A4%A7%E5%B0%8F%E8%8C%83%E5%9B%B4%E4%B8%BA%E4%BB%80%E4%B9%88%E6%98%AF-128~127/">byte一个字节的数据大小范围为什么是-128~127</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8/MAC-%E7%BD%91%E6%98%93mumu%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8%E4%BF%AE%E6%94%B9hosts/">MAC 网易mumu安卓模拟器修改hosts</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/VM/%E5%86%85%E7%BD%91%E8%AE%BF%E9%97%AE%E4%B8%8D%E5%88%B0%E5%AE%BF%E4%B8%BB%E6%9C%BA%E5%86%85%E9%83%A8centos%E8%99%9A%E6%8B%9F%E6%9C%BA/">内网访问不到宿主机内部centos虚拟机</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/TOOL/pierced%EF%BC%9A%E9%92%89%E9%92%89%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F/">pierced钉钉内网穿透，仅支持80/443端口</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/Spring/SpringCloud/%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1/">负载均衡</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/Spring/SpringCloud/%E6%9C%8D%E5%8A%A1%E6%B3%A8%E5%86%8C%E4%B8%8E%E5%8F%91%E7%8E%B0/">服务注册与发现</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-external-link"> 友情链接</i></div></div></div></div><div class="pure-u-1 pure-u-md-3-4"><div id="footer">Copyright © 2024 <a href="/." rel="nofollow">Programming Notes.</a> Powered by<a rel="nofollow" target="_blank" href="https://hexo.io"> Hexo.</a><a rel="nofollow" target="_blank" href="https://github.com/tufu9441/maupassant-hexo"> Theme</a> by<a rel="nofollow" target="_blank" href="https://github.com/pagecho"> Cho.</a></div></div></div><a class="show" id="rocket" href="#top"></a><script type="text/javascript" src="/js/totop.js?v=1.0.0" async></script><script type="text/javascript" src="//lib.baomitu.com/fancybox/latest/jquery.fancybox.min.js"></script><script type="text/javascript" src="/js/fancybox.js?v=1.0.0"></script><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/fancybox/latest/jquery.fancybox.min.css"><script type="text/javascript" src="/js/copycode.js?v=1.0.0" successtext="复制成功！"></script><link rel="stylesheet" type="text/css" href="/css/copycode.css?v=1.0.0"><script type="text/javascript" src="/js/codeblock-resizer.js?v=1.0.0"></script><script type="text/javascript" src="/js/smartresize.js?v=1.0.0"></script></div></body></html>

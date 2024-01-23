@@ -1,0 +1,107 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="description" content=""><title>MySQL 实战45讲-04-索引 | Programming Notes</title><link rel="stylesheet" type="text/css" href="/css/style.css?v=1.0.0"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/normalize/latest/normalize.min.css"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/pure/latest/pure-min.min.css"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/pure/latest/grids-responsive-min.min.css"><link rel="stylesheet" href="//lib.baomitu.com/font-awesome/4.7.0/css/font-awesome.min.css"><script type="text/javascript" src="//lib.baomitu.com/jquery/latest/jquery.min.js"></script><link rel="icon" mask="" sizes="any" href="/favicon.ico"><link rel="Shortcut Icon" type="image/x-icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png"><script type="text/javascript" src="//lib.baomitu.com/clipboard.js/latest/clipboard.min.js"></script><script type="text/javascript" src="//lib.baomitu.com/toastr.js/latest/toastr.min.js"></script><link rel="stylesheet" href="//lib.baomitu.com/toastr.js/latest/toastr.min.css"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="body_container"><div id="header"><div class="site-name"><h1 class="hidden">MySQL 实战45讲-04-索引</h1><a id="logo" href="/.">Programming Notes</a><p class="description"></p></div><div id="nav-menu"><a class="current" href="/."><i class="fa fa-home"> 首页</i></a><a href="/archives/"><i class="fa fa-archive"> 归档</i></a><a href="/about/"><i class="fa fa-user"> 关于</i></a><a href="/atom.xml"><i class="fa fa-rss"> 订阅</i></a></div></div><div class="pure-g" id="layout"><div class="pure-u-1 pure-u-md-3-4"><div class="content_container"><div class="post"><h1 class="post-title">MySQL 实战45讲-04-索引</h1><div class="post-meta">2024-01-23<span> | </span><span class="category"><a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></span></div><div class="post-content"><h3 id="常见的索引"><a href="#常见的索引" class="headerlink" title="常见的索引"></a>常见的索引</h3><p>常见三种哈希表、有序数组和搜索树</p>
+<h4 id="哈希表"><a href="#哈希表" class="headerlink" title="哈希表"></a>哈希表</h4><p>哈希表索引是一种键-值(key-value)存储结构。如果key hash之后出现冲撞，value会拉出来一个链表。</p>
+<p><strong>哈希表这种结构适用于只有等值查询的场景</strong></p>
+<h4 id="有序数组"><a href="#有序数组" class="headerlink" title="有序数组"></a>有序数组</h4><p>按照字段递增的顺序进行排序。如果是等值查询使用二分法就可以快速得到，这个时间复杂度是 O(log(N))。</p>
+<p><strong>有序数组在等值查询和范围查询场景中的性能就都非常帮，但是对于插入成本太高了，每次插入都需要挪动后面所有的记录。有序数组只适合静态数据(不会变化)</strong></p>
+<h4 id="搜索树"><a href="#搜索树" class="headerlink" title="搜索树"></a>搜索树</h4><p>查找和更新的时间复杂度均为O(logN)，但对于机械磁盘读写来说，需要放弃二叉树而使用N叉树。</p>
+<h3 id="InnoDB的索引模型"><a href="#InnoDB的索引模型" class="headerlink" title="InnoDB的索引模型"></a>InnoDB的索引模型</h3><p>索引类型分为主键索引和非主键索引。在InnoDB引擎中，索引的模型采用了B+树结构。每一个索引在InnoDB里面都对应一棵B+树</p>
+<p>主键索引的叶子节点存储的都是整行数据。在InnoDB主键索引也被称为聚簇索引(clustered index)。</p>
+<p>非主键索引的叶子节点都是放的是主键的值，在InnoDB非主键索引也被称为二级索引(secondary index)。</p>
+<p><strong>基于主键索引和普通索引的查询有什么区别？</strong></p>
+<ul>
+<li>主键索引: 会拿着值直接搜索这棵 B+树。</li>
+<li>普通索引：拿着值去查询普通索引树查询出来主键ID。然后拿着ID再去主键索引数据搜索一次。这个过程称为回表。</li>
+</ul>
+<p>基于非主键索引的查询需要多扫描一棵索引树。因此，我们在应用中应该尽量使用主键查询。</p>
+<p><strong>回表查询</strong></p>
+<p><strong>回到主键索引树搜索的过程，我们称为回表</strong>。</p>
+<p>普通索引叶子节点是存储的主键值。每次查询普通索引得倒主键值，在根据主键值查询主键索引，这个过程是回表查询。</p>
+<p>如何避免回表查询？<strong>覆盖索引</strong></p>
+<p><strong>覆盖索引</strong></p>
+<p>把查询字段在普通索引内包含，这样就会避免再去查询主键索引。</p>
+<p><strong>由于覆盖索引可以减少树的搜索次数，显著提升查询性能，所以使用覆盖索引是一个常用的性能优化手段。</strong></p>
+<h3 id="索引维护"><a href="#索引维护" class="headerlink" title="索引维护"></a>索引维护</h3><p>B+ 树为了维护索引的有序性，在插入新值的时候需要必要的维护，往往需要挪到数据页的数据，会产生页分裂和页合并。</p>
+<p><strong>页分裂和页合并</strong></p>
+<p>页分裂：申请新的数据页，挪动部分数据从旧数据页到新数据页。不仅有性能问题，还会占用空间。</p>
+<p>页合并：相邻两个页由于删除了数据，利用率很低之后，会将两个数据页合并。</p>
+<p><strong>自增主键</strong></p>
+<p>使用自增主键，每次插入新纪录都是追加，不涉及挪动其他记录，因此效率最高（性能），非主键索引占用的空间也最小（存储空间）。</p>
+<p><strong>主键长度越小，普通索引的叶子节点就越小，普通索引占用的空间也就越小。</strong></p>
+<p>从性能和存储空间方面考量，自增主键往往是更合理的选择。</p>
+<p><strong>最左前缀原则</strong></p>
+<p>B+ 树这种索引结构，可以利用索引的“最左前缀”，来定位记录。索引项是按照索引定义里面出现的字段顺序排序的。</p>
+<p><img src="https://gitee.com/liugd2018/img-folder/raw/5f4ae01f310c24e13d6156ab87416e28b9d05823/note/mysql/mysql%E5%AE%9E%E6%88%9845%E8%AE%B2-03.png"></p>
+<p>当你的逻辑需求是查到所有名字是“张三”的人时，可以快速定位到 ID4，然后向后遍历得到所有需要的结果。</p>
+<p>如果你要查的是所有名字第一个字是“张”的人，你的 SQL 语句的条件是”where name like ‘张 %’”。这时，你也能够用上这个索引，查找到第一个符合条件的记录是 ID3，然后向后遍历，直到不满足条件为止。</p>
+<p>可以看到，不只是索引的全部定义，只要满足最左前缀，就可以利用索引来加速检索。这个最左前缀可以是联合索引的最左 N 个字段，也可以是字符串索引的最左 M 个字符。</p>
+<p><strong>在建立联合索引的时候，如何安排索引内的字段顺序。</strong></p>
+<p><strong>第一原则是，如果通过调整顺序，可以少维护一个索引，那么这个顺序往往就是需要优先考虑采用的。</strong></p>
+<p><strong>第二原则是，如果不得不维护另外的索引，那么需要考虑存储空间的大小。</strong></p>
+<p>比如联合索引(a,b)，如果既有(a,b)联合索引，查询和a,b单独查询的时候，我们要建立(a,b)联合索引和(b)索引两个索引。如果b的字段比a的字段要大，就需要考虑一下空间了，就可以建立(b,a)联合索引,(a)两个索引。</p>
+<p><strong>索引下推</strong></p>
+<p>市民表的联合索引（name, age）为例。如果现在有一个需求：检索出表中“名字第一个字是张，而且年龄是 10 岁的所有男孩”。那么，SQL 语句是这么写的</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">select</span> <span class="operator">*</span> <span class="keyword">from</span> tuser <span class="keyword">where</span> name <span class="keyword">like</span> <span class="string">&#x27;张 %&#x27;</span> <span class="keyword">and</span> age<span class="operator">=</span><span class="number">10</span> <span class="keyword">and</span> ismale<span class="operator">=</span><span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+
+<p>你已经知道了前缀索引规则，所以这个语句在搜索索引树的时候，只能用 “张”，找到第一个满足条件的记录 ID3。当然，这还不错，总比全表扫描要好。</p>
+<p>使用前缀索引规则匹配索引的前几个字符值，然后再去过滤数据。</p>
+<p>在 MySQL 5.6 之前，只能从 索引查询到匹配的值然后开始一个一个回表。到主键索引上找出数据行，再对比字段值。</p>
+<p>而 MySQL 5.6 引入的索引下推优化（index condition pushdown)， 可以在索引遍历过程中，对索引中包含的字段先做判断，直接过滤掉不满足条件的记录，减少回表次数。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql%E5%AE%9E%E6%88%9845%E8%AE%B2-04.png"></p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/mysql/mysql%E5%AE%9E%E6%88%9845%E8%AE%B2-05.png"></p>
+<h3 id="普通索引和唯一索引，应该怎么选择？"><a href="#普通索引和唯一索引，应该怎么选择？" class="headerlink" title="普通索引和唯一索引，应该怎么选择？"></a>普通索引和唯一索引，应该怎么选择？</h3><h4 id="查询差别"><a href="#查询差别" class="headerlink" title="查询差别"></a>查询差别</h4><p>普通索引，普通索引查询到满足的第一个条件，然后会在继续执行查询，直至到不满足查询条件为止。</p>
+<p>唯一索引，由于索引的唯一性，查询到第一个满足的条件就会终止查询。</p>
+<p><strong>严格来说，唯一索引的搜索过程比较快，因为”回表”的数据记录少，但是在实际操作中，这两种索引的带来的消耗几乎相等，差别微乎其微</strong>。</p>
+<h4 id="更新差别"><a href="#更新差别" class="headerlink" title="更新差别"></a>更新差别</h4><p>普通索引的更新，会使用到change buffer；</p>
+<p>唯一索引的更新，不会使用到change buffer;</p>
+<p><strong>什么是change buffer？</strong></p>
+<p>change buffer是内存中的一块区域，它保存在Innodb的buffer pool中，它在磁盘上也有对应的持久化空间，在系统表空间ibdata中。通过参数 innodb_change_buffer_max_size 来动态设置。这个参数设置为 50 的时候，表示change buffer 的大小最多只能占用 buffer pool 的 50%。</p>
+<p>当需要更新一个数据的时候，如果数据页在内存有这条消息就直接更新，而如果这个数据页不在内存，innoDB就会直接更新操作缓存的change buffer，下次访问磁盘上的数据页的时候，就会把数据页加载到内存中，然后执行 change buffer 中与这个页有关的操作。通过这种方式，有两个好处：</p>
+<ul>
+<li>如果能够将更新操作先记录在 change buffer，减少读磁盘，语句的执行速度会得到明显的提升</li>
+<li>数据读入内存是需要占用 buffer pool 的，所以这种方式还能够避免占用内存，提高内存利用率</li>
+</ul>
+<p>应用change buffer中与该数据页相关的操作的这个过程，我们称之为数据页的merge操作，merge操作在以下的场景下会触发</p>
+<ul>
+<li>访问数据页时候</li>
+<li>后台线程每秒都会merge</li>
+<li>数据库正常启停</li>
+</ul>
+<h5 id="为什么唯一索引不能使用change-buffer？"><a href="#为什么唯一索引不能使用change-buffer？" class="headerlink" title="为什么唯一索引不能使用change buffer？"></a><strong>为什么唯一索引不能使用change buffer？</strong></h5><p>唯一索引在做insert或者update的时候，需要判断索引记录的唯一性，而判断唯一性必须要在内存中判断，所以数据页会被加载到内存中，如果数据页已经加载到了内存中，那么当然是直接更新内存更快了。</p>
+<p>唯一索引的更新就不能使用 change buffer，实际上也只有普通索引可以使用。</p>
+<h5 id="唯一索引和普通索引在更新差别"><a href="#唯一索引和普通索引在更新差别" class="headerlink" title="唯一索引和普通索引在更新差别"></a>唯一索引和普通索引在更新差别</h5><h6 id="更新记录在内存中"><a href="#更新记录在内存中" class="headerlink" title="更新记录在内存中"></a>更新记录在内存中</h6><p>普通索引:就会更新数据的范围直接在数据页上插入</p>
+<p>唯一索引:会多一步check操作。会check更新的数据范围是否存在这个值。</p>
+<p>当记录在内存中的时候，这俩差别不大，仅仅是唯一索引多了一步判断唯一性的操作。这个判断，仅仅会消耗很小一部分cpu的资源。</p>
+<h6 id="更新记录不在内存中"><a href="#更新记录不在内存中" class="headerlink" title="更新记录不在内存中"></a>更新记录不在内存中</h6><ul>
+<li><p>对于唯一索引来说，需要将数据页读入内存，判断到没有冲突，插入这个值，语句执行结束；</p>
+</li>
+<li><p>对于普通索引来说，则是将更新记录在 change buffer，语句执行就结束了。</p>
+</li>
+</ul>
+<p>普通索引利用了change buffer，减少了磁盘上的随机访问，对性能的提升比较明显。</p>
+<h5 id="change-buffer使用场景"><a href="#change-buffer使用场景" class="headerlink" title="change buffer使用场景"></a>change buffer使用场景</h5><p>在一些写多读少的业务中，change buffer能够发挥很好的作用。它可以将多次对磁盘的操作，合并成一次merge操作，从而提高MySQL的性能，一次性merge的操作越多，收益就越大。但是需要注意，如果你的数据写入之后。立马会读取(也就意味着需要从磁盘读取到内存)，那么建议不要使用change buffer，因为在这种情况下，使用change buffer不会减低IO次数，反而多了change buffer的维护开销。</p>
+<h5 id="change-buffer和redo-log的交互"><a href="#change-buffer和redo-log的交互" class="headerlink" title="change buffer和redo log的交互"></a>change buffer和redo log的交互</h5><p>当我们要更新一条普通索引记录的时候：</p>
+<ul>
+<li><p>如果这条记录在内存中，那么直接更新内存；</p>
+</li>
+<li><p>如果该记录没有在内存中，那么就需要更新change buffer</p>
+</li>
+<li><p>更新完change buffer之后，MySQL会在redo log中记录下change buffer的修改，</p>
+</li>
+<li><p>事务就算完成了，后续binlog落盘，redo log commit</p>
+</li>
+<li><p>当需要读取不在内存中的记录时，会将该数据页从磁盘加载到内存，然后应用change buffer中的修改，也就是merge操作</p>
+</li>
+</ul>
+<h4 id="MySQL-为什么有时候会选错索引？"><a href="#MySQL-为什么有时候会选错索引？" class="headerlink" title="MySQL 为什么有时候会选错索引？"></a>MySQL 为什么有时候会选错索引？</h4><h5 id="优化器逻辑"><a href="#优化器逻辑" class="headerlink" title="优化器逻辑"></a>优化器逻辑</h5><p>选择索引就是优化器的工作，优化器会选择一个扫描的行数少，意味着访问磁盘数据的次数越少，消耗的 CPU 资源越少。</p>
+<p>优化器还会结合是否使用临时表、是否排序等因素进行综合判断，简单的查询语句并没有涉及到临时表和排序，所以 MySQL 选错索引肯定是在判断扫描行数的时候出问题了。</p>
+<h5 id="如何解决MYSQL选错索引"><a href="#如何解决MYSQL选错索引" class="headerlink" title="如何解决MYSQL选错索引"></a>如何解决MYSQL选错索引</h5><ul>
+<li><p>如果是MYSQL索引信息统计错误，则可以使用 analyze table table_name 命令来解决。</p>
+</li>
+<li><p>可以使用 force index(index_name) 来强制使用某索引。<br>例如： select * from  t force idnex(a) ; t为表名，a为索引名</p>
+</li>
+<li><p>可以选择新建合适的索引，或者将错误的不重要的索引删除。</p>
+</li>
+<li><p>可以修改SQL语句，诱导MYSQL使用正确的索引。</p>
+</li>
+</ul>
+</div><div class="tags"><ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/MYSQL%E5%AE%9E%E6%88%9845%E8%AE%B2%E7%AC%94%E8%AE%B0/" rel="tag">MYSQL实战45讲笔记</a></li></ul></div><div class="post-nav"><a class="pre" href="/2024/01/23/MYSQL/MySQL-%E5%AE%9E%E6%88%9845%E8%AE%B2-03-%E4%BA%8B%E7%89%A9%E9%9A%94%E7%A6%BB/">MySQL 实战45讲-03-事物隔离级别</a><a class="next" href="/2024/01/23/MYSQL/MySQL-%E5%AE%9E%E6%88%9845%E8%AE%B2-02-redo%20log(%E9%87%8D%E5%81%9A%E6%97%A5%E5%BF%97)%E5%92%8Cbin%20log(%E5%BD%92%E6%A1%A3%E6%97%A5%E5%BF%97)/">MySQL 实战45讲-02 redo log(重做日志)和bin log(归档日志)</a></div></div></div></div><div class="pure-u-1-4 hidden_mid_and_down"><div id="sidebar"><div class="widget"><form class="search-form" action="//www.google.com/search" method="get" accept-charset="utf-8" target="_blank"><input type="text" name="q" maxlength="20" placeholder="Search"/><input type="hidden" name="sitesearch" value="http://liugd2018.github.io"/></form></div><div class="widget"><form class="search-form" action="//www.baidu.com/baidu" method="get" accept-charset="utf-8" target="_blank"><input type="search" name="word" maxlength="20" placeholder="Search"/><input type="hidden" name="si" value="http://liugd2018.github.io"/><input name="tn" type="hidden" value="bds"/><input name="cl" type="hidden" value="3"/><input name="ct" type="hidden" value="2097152"/><input name="s" type="hidden" value="on"/></form></div><div class="widget"><div class="author-info"><a class="info-avatar" href="/about/" title="关于"><img class="nofancybox" src="/img/avatar.png"/></a><p>To be a better man.</p><a class="info-icon" href="mailto:liugd2020@gmail.com" title="Email" target="_blank" style="margin-inline:5px"> <i class="fa fa-envelope-square" style="margin-inline:5px"></i></a><a class="info-icon" href="https://github.com/liugd2018" title="Github" target="_blank" style="margin-inline:5px"> <i class="fa fa-github-square" style="margin-inline:5px"></i></a><a class="info-icon" href="/atom.xml" title="RSS" target="_blank" style="margin-inline:5px"> <i class="fa fa-rss-square" style="margin-inline:5px"></i></a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-folder-o"> 分类</i></div><ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Elasticsearch/">Elasticsearch</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/IDEA/">IDEA</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/JAVA/">JAVA</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/LIUNX/">LIUNX</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Redis/">Redis</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Spring/">Spring</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/kubernetes/">kubernetes</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/leetcode/">leetcode</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/lombok/">lombok</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/mongoDB/">mongoDB</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/openvpn/">openvpn</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E4%B8%80%E5%85%A5java%E6%B7%B1%E4%BC%BC%E6%B5%B7/">一入java深似海</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%8E%8B%E6%B5%8B/">压测</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8/">安卓模拟器</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%AE%B9%E5%99%A8/">容器</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%B0%8F%E9%A9%AC%E5%93%A5java%E8%BF%9B%E9%98%B6%E8%AE%AD%E7%BB%83%E8%90%A5/">小马哥java进阶训练营</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%B7%A5%E5%85%B7/">工具</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/">操作系统</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/">数据结构</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/">数据结构与算法之美</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E7%BC%96%E7%A8%8B%E6%8A%80%E6%9C%AF/">编程技术</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E8%99%9A%E6%8B%9F%E5%8C%96/">虚拟化</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-star-o"> 标签</i></div><div class="tagcloud"><a href="/tags/Elasticsearch/" style="font-size: 15px;">Elasticsearch</a> <a href="/tags/IDEA/" style="font-size: 15px;">IDEA</a> <a href="/tags/lombok/" style="font-size: 15px;">lombok</a> <a href="/tags/Java/" style="font-size: 15px;">Java</a> <a href="/tags/JAVA/" style="font-size: 15px;">JAVA</a> <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" style="font-size: 15px;">数据结构</a> <a href="/tags/mac%E5%86%85%E5%BD%95/" style="font-size: 15px;">mac内录</a> <a href="/tags/%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F/" style="font-size: 15px;">内网穿透</a> <a href="/tags/MYSQL/" style="font-size: 15px;">MYSQL</a> <a href="/tags/MYSQL%E5%AE%9E%E6%88%9845%E8%AE%B2%E7%AC%94%E8%AE%B0/" style="font-size: 15px;">MYSQL实战45讲笔记</a> <a href="/tags/Hyper-V/" style="font-size: 15px;">Hyper-V</a> <a href="/tags/k8s%E5%8E%8B%E6%B5%8B/" style="font-size: 15px;">k8s压测</a> <a href="/tags/%E6%95%B0%E7%BB%84/" style="font-size: 15px;">数组</a> <a href="/tags/%E9%93%BE%E8%A1%A8/" style="font-size: 15px;">链表</a> <a href="/tags/kubernetes/" style="font-size: 15px;">kubernetes</a> <a href="/tags/LIUNX/" style="font-size: 15px;">LIUNX</a> <a href="/tags/mongoDB/" style="font-size: 15px;">mongoDB</a> <a href="/tags/Redis/" style="font-size: 15px;">Redis</a> <a href="/tags/%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8/" style="font-size: 15px;">安卓模拟器</a> <a href="/tags/openvpn/" style="font-size: 15px;">openvpn</a> <a href="/tags/Docker/" style="font-size: 15px;">Docker</a> <a href="/tags/Containerd/" style="font-size: 15px;">Containerd</a> <a href="/tags/%E7%AC%94%E8%AE%B0/" style="font-size: 15px;">笔记</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 15px;">操作系统</a> <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/" style="font-size: 15px;">数据结构与算法之美</a> <a href="/tags/RabbitMQ/" style="font-size: 15px;">RabbitMQ</a> <a href="/tags/Spring-Cloud/" style="font-size: 15px;">Spring Cloud</a> <a href="/tags/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98/" style="font-size: 15px;">线上问题</a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-file-o"> 最近文章</i></div><ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/MYSQL/%E7%BA%BF%E4%B8%8A%E6%95%B0%E6%8D%AE%E5%BA%93%E5%A0%B5%E5%A1%9E/">线上数据库连接数爆满导致堵塞</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E7%BE%8E/%E7%AE%97%E6%B3%95%E9%A6%96%E9%A1%B5-01/">数据结构和算法分类</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E5%AE%B9%E5%99%A8/Docker%E5%9F%BA%E7%A1%80/">Docker基础</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E5%AE%B9%E5%99%A8/Containerd-%E6%90%AD%E5%BB%BA%E4%BB%A5%E5%8F%8A%E4%BD%BF%E7%94%A8/">Containerd 搭建以及使用</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/byte%E4%B8%80%E4%B8%AA%E5%AD%97%E8%8A%82%E7%9A%84%E6%95%B0%E6%8D%AE%E5%A4%A7%E5%B0%8F%E8%8C%83%E5%9B%B4%E4%B8%BA%E4%BB%80%E4%B9%88%E6%98%AF-128~127/">byte一个字节的数据大小范围为什么是-128~127</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8/MAC-%E7%BD%91%E6%98%93mumu%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8%E4%BF%AE%E6%94%B9hosts/">MAC 网易mumu安卓模拟器修改hosts</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/VM/%E5%86%85%E7%BD%91%E8%AE%BF%E9%97%AE%E4%B8%8D%E5%88%B0%E5%AE%BF%E4%B8%BB%E6%9C%BA%E5%86%85%E9%83%A8centos%E8%99%9A%E6%8B%9F%E6%9C%BA/">内网访问不到宿主机内部centos虚拟机</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/TOOL/pierced%EF%BC%9A%E9%92%89%E9%92%89%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F/">pierced钉钉内网穿透，仅支持80/443端口</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/Spring/SpringCloud/%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1/">负载均衡</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/Spring/SpringCloud/%E6%9C%8D%E5%8A%A1%E6%B3%A8%E5%86%8C%E4%B8%8E%E5%8F%91%E7%8E%B0/">服务注册与发现</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-external-link"> 友情链接</i></div></div></div></div><div class="pure-u-1 pure-u-md-3-4"><div id="footer">Copyright © 2024 <a href="/." rel="nofollow">Programming Notes.</a> Powered by<a rel="nofollow" target="_blank" href="https://hexo.io"> Hexo.</a><a rel="nofollow" target="_blank" href="https://github.com/tufu9441/maupassant-hexo"> Theme</a> by<a rel="nofollow" target="_blank" href="https://github.com/pagecho"> Cho.</a></div></div></div><a class="show" id="rocket" href="#top"></a><script type="text/javascript" src="/js/totop.js?v=1.0.0" async></script><script type="text/javascript" src="//lib.baomitu.com/fancybox/latest/jquery.fancybox.min.js"></script><script type="text/javascript" src="/js/fancybox.js?v=1.0.0"></script><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/fancybox/latest/jquery.fancybox.min.css"><script type="text/javascript" src="/js/copycode.js?v=1.0.0" successtext="复制成功！"></script><link rel="stylesheet" type="text/css" href="/css/copycode.css?v=1.0.0"><script type="text/javascript" src="/js/codeblock-resizer.js?v=1.0.0"></script><script type="text/javascript" src="/js/smartresize.js?v=1.0.0"></script></div></body></html>

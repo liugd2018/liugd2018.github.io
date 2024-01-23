@@ -1,0 +1,182 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="description" content=""><title>波动的响应延迟 | Programming Notes</title><link rel="stylesheet" type="text/css" href="/css/style.css?v=1.0.0"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/normalize/latest/normalize.min.css"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/pure/latest/pure-min.min.css"><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/pure/latest/grids-responsive-min.min.css"><link rel="stylesheet" href="//lib.baomitu.com/font-awesome/4.7.0/css/font-awesome.min.css"><script type="text/javascript" src="//lib.baomitu.com/jquery/latest/jquery.min.js"></script><link rel="icon" mask="" sizes="any" href="/favicon.ico"><link rel="Shortcut Icon" type="image/x-icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png"><script type="text/javascript" src="//lib.baomitu.com/clipboard.js/latest/clipboard.min.js"></script><script type="text/javascript" src="//lib.baomitu.com/toastr.js/latest/toastr.min.js"></script><link rel="stylesheet" href="//lib.baomitu.com/toastr.js/latest/toastr.min.css"><meta name="generator" content="Hexo 6.3.0"></head><body><div class="body_container"><div id="header"><div class="site-name"><h1 class="hidden">波动的响应延迟</h1><a id="logo" href="/.">Programming Notes</a><p class="description"></p></div><div id="nav-menu"><a class="current" href="/."><i class="fa fa-home"> 首页</i></a><a href="/archives/"><i class="fa fa-archive"> 归档</i></a><a href="/about/"><i class="fa fa-user"> 关于</i></a><a href="/atom.xml"><i class="fa fa-rss"> 订阅</i></a></div></div><div class="pure-g" id="layout"><div class="pure-u-1 pure-u-md-3-4"><div class="content_container"><div class="post"><h1 class="post-title">波动的响应延迟</h1><div class="post-meta">2024-01-23<span> | </span><span class="category"><a href="/categories/Redis/">Redis</a></span></div><div class="post-content"><h2 id="如何判断-Redis-是不是真的变慢了"><a href="#如何判断-Redis-是不是真的变慢了" class="headerlink" title="如何判断 Redis 是不是真的变慢了"></a>如何判断 Redis 是不是真的变慢了</h2><h3 id="查看-Redis-的响应延迟"><a href="#查看-Redis-的响应延迟" class="headerlink" title="查看 Redis 的响应延迟"></a>查看 Redis 的响应延迟</h3><h3 id="当前环境下的-Redis-基线性能"><a href="#当前环境下的-Redis-基线性能" class="headerlink" title="当前环境下的 Redis 基线性能"></a>当前环境下的 Redis 基线性能</h3><p>基线性能：也就是一个系统在低压力、无干扰下的基本性能，这个性能只由当前的软硬件配置决定。基线性能和当前的操作系统、硬件配置相关。</p>
+<p>从 2.8.7 版本开始，redis-cli 命令提供了–intrinsic-latency 选项，可以用来监测和统计测试期间内的最大延迟，这个延迟可以作为 Redis 的基线性能。其中，测试时长可以用–intrinsic-latency 选项的参数来指定。</p>
+<p>比如说，我们运行下面的命令，该命令会打印 120 秒内监测到的最大延迟。可以看到，这里的最大延迟是 119 微秒，也就是基线性能为 119 微秒。一般情况下，运行 120 秒就足够监测到最大延迟了，所以，我们可以把参数设置为 120。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">./redis-cli --intrinsic-latency 120</span><br><span class="line">Max latency so far: 17 microseconds.</span><br><span class="line">Max latency so far: 44 microseconds.</span><br><span class="line">Max latency so far: 94 microseconds.</span><br><span class="line">Max latency so far: 110 microseconds.</span><br><span class="line">Max latency so far: 119 microseconds.</span><br><span class="line"></span><br><span class="line">36481658 total runs (avg latency: 3.2893 microseconds / 3289.32 nanoseconds per run).</span><br><span class="line">Worst run took 36x longer than the average latency.</span><br></pre></td></tr></table></figure>
+
+<p>你要把运行时延迟和基线性能进行对比，如果你观察到的 Redis 运行时延迟是其基线性能的 2 倍及以上，就可以认定 Redis 变慢了。</p>
+<p>在虚拟化环境（例如虚拟机或容器）中，由于增加了虚拟化软件层，与物理机相比，虚拟机或容器本身就会引入一定的性能开销，所以基线性能会高一些。下面的测试结果，显示的就是某一个虚拟机上运行 Redis 时测的基线性能。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">./redis-cli --intrinsic-latency 120</span></span><br><span class="line">Max latency so far: 692 microseconds.</span><br><span class="line">Max latency so far: 915 microseconds.</span><br><span class="line">Max latency so far: 2193 microseconds.</span><br><span class="line">Max latency so far: 9343 microseconds.</span><br><span class="line">Max latency so far: 9871 microseconds.</span><br></pre></td></tr></table></figure>
+
+<p>可以看到，由于虚拟化软件本身的开销，此时的基线性能已经达到了 9.871ms。如果该 Redis 实例的运行时延迟为 10ms，这并不能算作性能变慢，因为此时，运行时延迟只比基线性能增加了 1.3%。如果你不了解基线性能，一看到较高的运行时延迟，就很有可能误判 Redis 变慢了。</p>
+<p>不过，我们通常是通过客户端和网络访问 Redis 服务，为了避免网络对基线性能的影响，刚刚说的这个命令需要在服务器端直接运行，这也就是说，我们只考虑服务器端软硬件环境的影响。</p>
+<h3 id="网络问题"><a href="#网络问题" class="headerlink" title="网络问题"></a>网络问题</h3><p>如果你想了解网络对 Redis 性能的影响，一个简单的方法是用 <strong>iPerf</strong> 这样的工具，测量从 Redis 客户端到服务器端的网络延迟。如果这个延迟有几十毫秒甚至是几百毫秒，就说明，Redis 运行的网络环境中很可能有大流量的其他应用程序在运行，导致网络拥塞了。这个时候，你就需要协调网络运维，调整网络的流量分配了。</p>
+<h2 id="如何应对-Redis-变慢？"><a href="#如何应对-Redis-变慢？" class="headerlink" title="如何应对 Redis 变慢？"></a>如何应对 Redis 变慢？</h2><p>Redis 自身的操作特性、文件系统和操作系统，它们是影响 Redis 性能的三大要素。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/redis/1659274922744.jpg"></p>
+<h3 id="Redis-自身操作特性的影响"><a href="#Redis-自身操作特性的影响" class="headerlink" title="Redis 自身操作特性的影响"></a>Redis 自身操作特性的影响</h3><p>Redis 提供的键值对命令操作对延迟性能的影响。我重点介绍两类关键操作：慢查询命令和过期 key 操作。</p>
+<h4 id="慢查询命令"><a href="#慢查询命令" class="headerlink" title="慢查询命令"></a>慢查询命令</h4><p>慢查询命令，就是指在 Redis 中执行速度慢的命令，这会导致 Redis 延迟增加。Redis 提供的命令操作很多，并不是所有命令都慢，这和命令操作的复杂度有关。</p>
+<h5 id="排查建议和解决方法"><a href="#排查建议和解决方法" class="headerlink" title="排查建议和解决方法"></a>排查建议和解决方法</h5><p>当你发现 Redis 性能变慢时，可以通过 Redis 日志，或者是 latency monitor 工具，查询变慢的请求，根据请求对应的具体命令以及官方文档，确认下是否采用了复杂度高的慢查询命令。</p>
+<p>如果的确有大量的慢查询命令，有两种处理方式：</p>
+<ul>
+<li>用其他高效命令代替。比如说，如果你需要返回一个 SET 中的所有成员时，不要使用 SMEMBERS 命令，而是要使用 SSCAN 多次迭代返回，避免一次返回大量数据，造成线程阻塞。</li>
+<li>当你需要执行排序、交集、并集操作时，可以在客户端完成，而不要用 SORT、SUNION、SINTER 这些命令，以免拖慢 Redis 实例。</li>
+</ul>
+<p>当然，如果业务逻辑就是要求使用慢查询命令，那你得考虑采用性能更好的 CPU，更快地完成查询命令，避免慢查询的影响。</p>
+<p>还有一个比较容易忽略的慢查询命令，就是 KEYS。它用于返回和输入模式匹配的所有 key，例如，以下命令返回所有包含“name”字符串的 keys。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_">redis&gt; </span><span class="language-bash">KEYS *name*</span></span><br><span class="line">1) &quot;lastname&quot;</span><br><span class="line">2) &quot;firstname&quot;</span><br></pre></td></tr></table></figure>
+
+<p><strong>因为 KEYS 命令需要遍历存储的键值对，所以操作延时高</strong>。如果你不了解它的实现而使用了它，就会导致 Redis 性能变慢。所以，<strong>KEYS 命令一般不被建议用于生产环境中。</strong></p>
+<h4 id="过期key操作"><a href="#过期key操作" class="headerlink" title="过期key操作"></a>过期key操作</h4><p>过期 key 的自动删除机制。它是 Redis 用来回收内存空间的常用机制，应用广泛，本身就会引起 Redis 操作阻塞，导致性能变慢，所以，你必须要知道该机制对性能的影响。</p>
+<p>Redis 键值对的 key 可以设置过期时间。默认情况下，Redis 每 100 毫秒会删除一些过期 key，具体的算法如下：</p>
+<ul>
+<li>采样 ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP 个数的 key，并将其中过期的 key 全部删除；</li>
+<li>如果超过 25% 的 key 过期了，则重复删除的过程，直到过期 key 的比例降至 25% 以下。</li>
+</ul>
+<p>ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP 是 Redis 的一个参数，默认是 20，那么，一秒内基本有 200 个过期 key 会被删除。(每次删除20个，每秒执行10次，共200次)这一策略对清除过期 key、释放内存空间很有帮助。如果每秒钟删除 200 个过期 key，并不会对 Redis 造成太大影响。</p>
+<p>如果触发了上面这个算法的第二条，Redis 就会一直删除以释放内存空间。注意，<strong>删除操作是阻塞的</strong>（Redis 4.0 后可以用异步线程机制来减少阻塞影响）。所以，一旦该条件触发，Redis 的线程就会一直执行删除，这样一来，就没办法正常服务其他的键值操作了，就会进一步引起其他键值操作的延迟增加，Redis 就会变慢。</p>
+<p>那么，算法的第二条是怎么被触发的呢？其中一个重要来源，就是<strong>频繁使用带有相同时间参数的 EXPIREAT 命令设置过期 key</strong>，这就会导致，在同一秒内有大量的 key 同时过期。 	</p>
+<p>我就要给出第二条排查建议和解决方法了。</p>
+<p>你要检查业务代码在使用 EXPIREAT 命令设置 key 过期时间时，是否使用了相同的 UNIX 时间戳，有没有使用 EXPIRE 命令给批量的 key 设置相同的过期秒数。因为，这都会造成大量 key 在同一时间过期，导致性能变慢。</p>
+<p>遇到这种情况时，千万不要嫌麻烦，你首先要根据实际业务的使用需求，决定 EXPIREAT 和 EXPIRE 的过期时间参数。其次，如果一批 key 的确是同时过期，你还可以在 EXPIREAT 和 EXPIRE 的过期时间参数上，加上一个一定大小范围内的随机数，这样，既保证了 key 在一个邻近时间范围内被删除，又避免了同时过期造成的压力。</p>
+<h4 id="文件系统"><a href="#文件系统" class="headerlink" title="文件系统"></a>文件系统</h4><p>AOF 模式</p>
+<p>AOF 日志提供了三种日志写回策略：no、everysec、always。这三种写回策略依赖文件系统的两个系统调用完成，也就是 write 和 fsync。</p>
+<p>write 只要把日志记录写到内核缓冲区，就可以返回了，并不需要等待日志实际写回到磁盘；而 fsync 需要把日志记录写回到磁盘后才能返回，时间较长。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/redis/1661136987768.jpg"></p>
+<p>当写回策略配置为 everysec 和 always 时，Redis 需要调用 fsync 把日志写回磁盘。</p>
+<p>在使用 everysec 时，Redis 允许丢失一秒的操作记录，Redis 会使用后台的子线程异步完成 fsync 的操作。</p>
+<p>而对于 always 策略来说，Redis 需要确保每个操作记录日志都写回磁盘，always 策略并不使用后台子线程来执行。</p>
+<p>注意点</p>
+<p>AOF重写日志时，AOF重写日志使用的子线程，也会存在阻塞风险。</p>
+<p>AOF 重写会对磁盘进行大量 IO 操作，同时，fsync 又需要等到数据写到磁盘后才能返回，所以，当 AOF 重写的压力比较大时，就会导致 fsync 被阻塞。</p>
+<p>当主线程使用后台子线程执行了一次 fsync，需要再次把新接收的操作记录写回磁盘时，如果主线程发现上一次的 fsync 还没有执行完，那么它就会阻塞。所以，如果后台子线程执行的 fsync 频繁阻塞的话（比如 AOF 重写占用了大量的磁盘 IO 带宽），主线程也会阻塞，导致 Redis 性能变慢。</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/redis/1661138721970.jpg"></p>
+<p>排查和解决建议：</p>
+<p>检查下 Redis 配置文件中的 appendfsync 配置项，该配置项的取值表明了 Redis 实例使用的是哪种 AOF 日志写回策略。如图：</p>
+<p><img src="https://liugd-oss.oss-cn-beijing.aliyuncs.com/note-picture/redis/1661139083251.jpg"></p>
+<p>如果 AOF 写回策略使用了 everysec 或 always 配置，请先确认下业务方对数据可靠性的要求，明确是否需要每一秒或每一个操作都记日志。在有些场景中（例如 Redis 用于缓存），数据丢了还可以从后端数据库中获取，并不需要很高的数据可靠性。</p>
+<p>如果业务应用对延迟非常敏感，但同时允许一定量的数据丢失，那么，可以把配置项 no-appendfsync-on-rewrite 设置为 yes，如下所示：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">no-appendfsync-on-rewrite yes</span><br></pre></td></tr></table></figure>
+
+<p>这个配置项设置为 yes 时，表示在 AOF 重写时，不进行 fsync 操作。也就是说，Redis 实例把写命令写到内存后，不调用后台线程进行 fsync 操作，就可以直接返回了。当然，如果此时实例发生宕机，就会导致数据丢失。反之，如果这个配置项设置为 no（也是默认配置），在 AOF 重写时，Redis 实例仍然会调用后台线程进行 fsync 操作，这就会给实例带来阻塞。</p>
+<p>如果的确需要高性能，同时也需要高可靠数据保证，我建议你考虑采用<strong>高速的固态硬盘作为 AOF 日志的写入设备</strong>。</p>
+<p>高速固态盘的带宽和并发度比传统的机械硬盘的要高出 10 倍及以上。在 AOF 重写和 fsync 后台线程同时执行时，固态硬盘可以提供较为充足的磁盘 IO 资源，让 AOF 重写和 fsync 后台线程的磁盘 IO 资源竞争减少，从而降低对 Redis 的性能影响。</p>
+<h4 id="操作系统"><a href="#操作系统" class="headerlink" title="操作系统"></a>操作系统</h4><h5 id="SWAP"><a href="#SWAP" class="headerlink" title="SWAP"></a>SWAP</h5><p>内存 swap 是操作系统里将内存数据在内存和磁盘间来回换入和换出的机制，涉及到磁盘的读写。一旦触发 swap，无论是被换入数据的进程，还是被换出数据的进程，其性能都会受到慢速磁盘读写的影响。</p>
+<p>swap和AOF日志文件读写fsync 线程不同，swap 触发后影响的是 Redis 主 IO 线程。</p>
+<p>什么时候会触发 swap 呢？</p>
+<p>触发 swap 的原因主要是物理机器内存不足，对于 Redis 而言，有两种常见的情况：</p>
+<ul>
+<li>Redis 实例自身使用了大量的内存，导致物理机器的可用内存不足；</li>
+<li>和 Redis 实例在同一台机器上运行的其他进程，在进行大量的文件读写操作。文件读写本身会占用系统内存，这会导致分配给 Redis 实例的内存量变少，进而触发 Redis 发生 swap。</li>
+</ul>
+<p>提供一个解决思路：<strong>增加机器的内存或者使用 Redis 集群</strong>。</p>
+<h6 id="怎么查看查看swap？"><a href="#怎么查看查看swap？" class="headerlink" title="怎么查看查看swap？"></a>怎么查看查看swap？</h6><p>操作系统本身会在后台记录每个进程的 swap 使用情况，即有多少数据量发生了 swap。</p>
+<p>查询到Redis 的进程号。比如下面的17999进程号。</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[root@xxx ~]# ps -ef|grep redis</span><br><span class="line">root     15194 11386  0 14:39 pts/0    00:00:00 grep --color=auto redis</span><br><span class="line">root     17999     1  0 Jan11 ?        07:29:39 redis-sentinel *:26379 [sentinel]</span><br></pre></td></tr></table></figure>
+
+<p>然后，进入 Redis 所在机器的 &#x2F;proc 目录下的该进程目录中：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[root@xxx ~]# cd /proc/17999</span><br></pre></td></tr></table></figure>
+
+<p>最后，运行下面的命令，查看该 Redis 进程的使用情况。在这儿，我只截取了部分结果：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">[root@xxx ~]# cat smaps | egrep &#x27;^(Swap|Size)&#x27;</span><br><span class="line">Size: 584 kB</span><br><span class="line">Swap: 0 kB</span><br><span class="line">Size: 4 kB</span><br><span class="line">Swap: 4 kB</span><br><span class="line">Size: 4 kB</span><br><span class="line">Swap: 0 kB</span><br><span class="line">Size: 462044 kB</span><br><span class="line">Swap: 462008 kB</span><br><span class="line">Size: 21392 kB</span><br><span class="line">Swap: 0 kB</span><br></pre></td></tr></table></figure>
+
+<p>每一行 Size 表示的是 Redis 实例所用的一块内存大小，而 Size 下方的 Swap 和它相对应，表示这块 Size 大小的内存区域有多少已经被换出到磁盘上了。如果这两个值相等，就表示这块内存区域已经完全被换出到磁盘了。</p>
+<p>作为内存数据库，Redis 本身会使用很多大小不一的内存块，所以，你可以看到有很多 Size 行，有的很小，就是 4KB，而有的很大，例如 462044KB。不同内存块被换出到磁盘上的大小也不一样，例如刚刚的结果中的第一个 4KB 内存块，它下方的 Swap 也是 4KB，这表示这个内存块已经被换出了；另外，462044KB 这个内存块也被换出了 462008KB，差不多有 462MB。这里有个重要的地方，我得提醒你一下，当出现百 MB，甚至 GB 级别的 swap 大小时，就表明，此时，Redis 实例的内存压力很大，很有可能会变慢。所以，swap 的大小是排查 Redis 性能变慢是否由 swap 引起的重要指标。</p>
+<p>一旦发生内存 swap，最直接的解决方法就是增加机器内存。如果该实例在一个 Redis 切片集群中，可以增加 Redis 集群的实例个数，来分摊每个实例服务的数据量，进而减少每个实例所需的内存量</p>
+<h5 id="内存大页"><a href="#内存大页" class="headerlink" title="内存大页"></a>内存大页</h5><p>内存大页机制（Transparent Huge Page, THP），也会影响 Redis 性能。</p>
+<p>Linux 内核从 2.6.38 开始支持内存大页机制，该机制支持 2MB 大小的内存页分配，而常规的内存页分配是按 4KB 的粒度来执行的。</p>
+<p>系统的设计通常是一个取舍过程（trade-off），很多机制通常都是优势和劣势并存的。</p>
+<p>虽然内存大页可以给 Redis 带来内存分配方面的收益，Redis 就会采用写时复制机制，也就是说，一旦有数据要被修改，Redis 并不会直接修改内存中的数据，而是将这些数据拷贝一份，然后再进行修改。</p>
+<p>如果采用了内存大页，那么，即使客户端请求只修改 100B 的数据，Redis 也需要拷贝 2MB 的大页。相反，如果是常规内存页机制，只用拷贝 4KB。两者相比，你可以看到，当客户端请求修改或新写入数据较多时，内存大页机制将导致大量的拷贝，这就会影响 Redis 正常的访存操作，最终导致性能变慢。</p>
+<p>关闭内存大页</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cat /sys/kernel/mm/transparent_hugepage/enabled</span><br></pre></td></tr></table></figure>
+
+<p>如果执行结果是 always，就表明内存大页机制被启动了；如果是 never，就表示，内存大页机制被禁止。</p>
+<p>在实际生产环境中部署时，我建议你不要使用内存大页机制，操作也很简单，只需要执行下面的命令就可以了:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">echo never /sys/kernel/mm/transparent_hugepage/enabled</span><br></pre></td></tr></table></figure>
+
+
+
+
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>介绍了判断 Redis 变慢的方法，一个是看响应延迟，一个是看基线性能。同时，我还给了你两种排查和解决 Redis 变慢这个问题的方法：</p>
+<ul>
+<li>从慢查询命令开始排查，并且根据业务需求替换慢查询命令；</li>
+<li>排查过期 key 的时间设置，并根据实际使用需求，设置不同的过期时间。</li>
+</ul>
+<p>关于如何分析、排查、解决Redis变慢问题，我总结的checklist如下：</p>
+<p> 1、使用复杂度过高的命令（例如SORT&#x2F;SUION&#x2F;ZUNIONSTORE&#x2F;KEYS），或一次查询全量数据（例如LRANGE key 0 N，但N很大）</p>
+<p> 分析：a) 查看slowlog是否存在这些命令 b) Redis进程CPU使用率是否飙升（聚合运算命令导致） </p>
+<p>解决：a) 不使用复杂度过高的命令，或用其他方式代替实现（放在客户端做） b) 数据尽量分批查询（LRANGE key 0 N，建议N&lt;&#x3D;100，查询全量数据建议使用HSCAN&#x2F;SSCAN&#x2F;ZSCAN）</p>
+<p> 2、操作bigkey </p>
+<p>分析：</p>
+<p>a) slowlog出现很多SET&#x2F;DELETE变慢命令（bigkey分配内存和释放内存变慢） </p>
+<p>b) 使用redis-cli -h $host -p $port –bigkeys扫描出很多bigkey </p>
+<p>解决：</p>
+<p>a) 优化业务，避免存储bigkey </p>
+<p>b) Redis 4.0+可开启lazy-free机制</p>
+<p> 3、大量key集中过期 </p>
+<p>分析：</p>
+<p>a) 业务使用EXPIREAT&#x2F;PEXPIREAT命令 </p>
+<p>b) Redis info中的expired_keys指标短期突增 </p>
+<p>解决：</p>
+<p>a) 优化业务，过期增加随机时间，把时间打散，减轻删除过期key的压力</p>
+<p> b) 运维层面，监控expired_keys指标，有短期突增及时报警排查</p>
+<p> 4、Redis内存达到maxmemory </p>
+<p>分析：</p>
+<p>a) 实例内存达到maxmemory，且写入量大，淘汰key压力变大</p>
+<p>b) Redis info中的evicted_keys指标短期突增 </p>
+<p>解决：</p>
+<p>a) 业务层面，根据情况调整淘汰策略（随机比LRU快） </p>
+<p>b) 运维层面，监控evicted_keys指标，有短期突增及时报警 </p>
+<p>c) 集群扩容，多个实例减轻淘汰key的压力 </p>
+<p>5、大量短连接请求 </p>
+<p>分析：</p>
+<p>Redis处理大量短连接请求，TCP三次握手和四次挥手也会增加耗时 </p>
+<p>解决：</p>
+<p>使用长连接操作Redis </p>
+<p>6、生成RDB和AOF重写fork耗时严重 </p>
+<p>分析：</p>
+<p>a) Redis变慢只发生在生成RDB和AOF重写期间 </p>
+<p>b) 实例占用内存越大，fork拷贝内存页表越久 </p>
+<p>c) Redis info中latest_fork_usec耗时变长 </p>
+<p>解决：</p>
+<p>a) 实例尽量小</p>
+<p>b) Redis尽量部署在物理机上 </p>
+<p>c) 优化备份策略（例如低峰期备份） </p>
+<p>d) 合理配置repl-backlog和slave client-output-buffer-limit，避免主从全量同步 </p>
+<p>e) 视情况考虑关闭AOF </p>
+<p>f) 监控latest_fork_usec耗时是否变长 </p>
+<p>7、AOF使用awalys机制 </p>
+<p>分析：</p>
+<p>磁盘IO负载变高 </p>
+<p>解决：</p>
+<p>a) 使用everysec机制 </p>
+<p>b) 丢失数据不敏感的业务不开启AOF </p>
+<p>8、使用Swap </p>
+<p>分析：</p>
+<p>a) 所有请求全部开始变慢 </p>
+<p>b) slowlog大量慢日志 </p>
+<p>c) 查看Redis进程是否使用到了Swap </p>
+<p>解决：</p>
+<p>a) 增加机器内存 </p>
+<p>b) 集群扩容 </p>
+<p>c) Swap使用时监控报警 </p>
+<p>9、进程绑定CPU不合理 </p>
+<p>分析：</p>
+<p>a) Redis进程只绑定一个CPU逻辑核 </p>
+<p>b) NUMA架构下，网络中断处理程序和Redis进程没有绑定在同一个Socket下 </p>
+<p>解决：</p>
+<p>a) Redis进程绑定多个CPU逻辑核 </p>
+<p>b) 网络中断处理程序和Redis进程绑定在同一个Socket下 </p>
+<p>10、开启透明大页机制 </p>
+<p>分析：</p>
+<p>生成RDB和AOF重写期间，主线程处理写请求耗时变长（拷贝内存副本耗时变长） </p>
+<p>解决：</p>
+<p>关闭透明大页机制 </p>
+<p>11、网卡负载过高 </p>
+<p>分析：</p>
+<p>a) TCP&#x2F;IP层延迟变大，丢包重传变多 </p>
+<p>b) 是否存在流量过大的实例占满带宽 </p>
+<p>解决：</p>
+<p>a) 机器网络资源监控，负载过高及时报警 </p>
+<p>b) 提前规划部署策略，访问量大的实例隔离部署 总之，Redis的性能与CPU、内存、网络、磁盘都息息相关，任何一处发生问题，都会影响到Redis的性能。</p>
+</div><div class="tags"><ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Redis/" rel="tag">Redis</a></li></ul></div><div class="post-nav"><a class="pre" href="/2024/01/23/redis/%E5%A6%82%E4%BD%95%E9%81%BF%E5%85%8D%E5%8D%95%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B%E7%9A%84%E9%98%BB%E5%A1%9E/">如何避免单线程模型的阻塞？</a><a class="next" href="/2024/01/23/redis/%E5%88%A0%E9%99%A4%E6%95%B0%E6%8D%AE%E5%90%8E%EF%BC%8C%E4%B8%BA%E4%BB%80%E4%B9%88%E5%86%85%E5%AD%98%E5%8D%A0%E7%94%A8%E7%8E%87%E8%BF%98%E6%98%AF%E5%BE%88%E9%AB%98/">删除数据后，为什么内存占用率还是很高？</a></div></div></div></div><div class="pure-u-1-4 hidden_mid_and_down"><div id="sidebar"><div class="widget"><form class="search-form" action="//www.google.com/search" method="get" accept-charset="utf-8" target="_blank"><input type="text" name="q" maxlength="20" placeholder="Search"/><input type="hidden" name="sitesearch" value="http://liugd2018.github.io"/></form></div><div class="widget"><form class="search-form" action="//www.baidu.com/baidu" method="get" accept-charset="utf-8" target="_blank"><input type="search" name="word" maxlength="20" placeholder="Search"/><input type="hidden" name="si" value="http://liugd2018.github.io"/><input name="tn" type="hidden" value="bds"/><input name="cl" type="hidden" value="3"/><input name="ct" type="hidden" value="2097152"/><input name="s" type="hidden" value="on"/></form></div><div class="widget"><div class="author-info"><a class="info-avatar" href="/about/" title="关于"><img class="nofancybox" src="/img/avatar.png"/></a><p>To be a better man.</p><a class="info-icon" href="mailto:liugd2020@gmail.com" title="Email" target="_blank" style="margin-inline:5px"> <i class="fa fa-envelope-square" style="margin-inline:5px"></i></a><a class="info-icon" href="https://github.com/liugd2018" title="Github" target="_blank" style="margin-inline:5px"> <i class="fa fa-github-square" style="margin-inline:5px"></i></a><a class="info-icon" href="/atom.xml" title="RSS" target="_blank" style="margin-inline:5px"> <i class="fa fa-rss-square" style="margin-inline:5px"></i></a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-folder-o"> 分类</i></div><ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/Elasticsearch/">Elasticsearch</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/IDEA/">IDEA</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/JAVA/">JAVA</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/LIUNX/">LIUNX</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Redis/">Redis</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/Spring/">Spring</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/kubernetes/">kubernetes</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/leetcode/">leetcode</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/lombok/">lombok</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/mongoDB/">mongoDB</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/openvpn/">openvpn</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E4%B8%80%E5%85%A5java%E6%B7%B1%E4%BC%BC%E6%B5%B7/">一入java深似海</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%8E%8B%E6%B5%8B/">压测</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8/">安卓模拟器</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%AE%B9%E5%99%A8/">容器</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%B0%8F%E9%A9%AC%E5%93%A5java%E8%BF%9B%E9%98%B6%E8%AE%AD%E7%BB%83%E8%90%A5/">小马哥java进阶训练营</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%B7%A5%E5%85%B7/">工具</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/">操作系统</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/">数据结构</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/">数据结构与算法之美</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E7%BC%96%E7%A8%8B%E6%8A%80%E6%9C%AF/">编程技术</a></li><li class="category-list-item"><a class="category-list-link" href="/categories/%E8%99%9A%E6%8B%9F%E5%8C%96/">虚拟化</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-star-o"> 标签</i></div><div class="tagcloud"><a href="/tags/Elasticsearch/" style="font-size: 15px;">Elasticsearch</a> <a href="/tags/IDEA/" style="font-size: 15px;">IDEA</a> <a href="/tags/lombok/" style="font-size: 15px;">lombok</a> <a href="/tags/Java/" style="font-size: 15px;">Java</a> <a href="/tags/JAVA/" style="font-size: 15px;">JAVA</a> <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" style="font-size: 15px;">数据结构</a> <a href="/tags/mac%E5%86%85%E5%BD%95/" style="font-size: 15px;">mac内录</a> <a href="/tags/%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F/" style="font-size: 15px;">内网穿透</a> <a href="/tags/MYSQL/" style="font-size: 15px;">MYSQL</a> <a href="/tags/MYSQL%E5%AE%9E%E6%88%9845%E8%AE%B2%E7%AC%94%E8%AE%B0/" style="font-size: 15px;">MYSQL实战45讲笔记</a> <a href="/tags/Hyper-V/" style="font-size: 15px;">Hyper-V</a> <a href="/tags/k8s%E5%8E%8B%E6%B5%8B/" style="font-size: 15px;">k8s压测</a> <a href="/tags/%E6%95%B0%E7%BB%84/" style="font-size: 15px;">数组</a> <a href="/tags/%E9%93%BE%E8%A1%A8/" style="font-size: 15px;">链表</a> <a href="/tags/kubernetes/" style="font-size: 15px;">kubernetes</a> <a href="/tags/LIUNX/" style="font-size: 15px;">LIUNX</a> <a href="/tags/mongoDB/" style="font-size: 15px;">mongoDB</a> <a href="/tags/Redis/" style="font-size: 15px;">Redis</a> <a href="/tags/%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8/" style="font-size: 15px;">安卓模拟器</a> <a href="/tags/openvpn/" style="font-size: 15px;">openvpn</a> <a href="/tags/Docker/" style="font-size: 15px;">Docker</a> <a href="/tags/Containerd/" style="font-size: 15px;">Containerd</a> <a href="/tags/%E7%AC%94%E8%AE%B0/" style="font-size: 15px;">笔记</a> <a href="/tags/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/" style="font-size: 15px;">操作系统</a> <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E4%B9%8B%E7%BE%8E/" style="font-size: 15px;">数据结构与算法之美</a> <a href="/tags/RabbitMQ/" style="font-size: 15px;">RabbitMQ</a> <a href="/tags/Spring-Cloud/" style="font-size: 15px;">Spring Cloud</a> <a href="/tags/%E7%BA%BF%E4%B8%8A%E9%97%AE%E9%A2%98/" style="font-size: 15px;">线上问题</a></div></div><div class="widget"><div class="widget-title"><i class="fa fa-file-o"> 最近文章</i></div><ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/MYSQL/%E7%BA%BF%E4%B8%8A%E6%95%B0%E6%8D%AE%E5%BA%93%E5%A0%B5%E5%A1%9E/">线上数据库连接数爆满导致堵塞</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E4%B8%8E%E7%AE%97%E6%B3%95%E7%BE%8E/%E7%AE%97%E6%B3%95%E9%A6%96%E9%A1%B5-01/">数据结构和算法分类</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E5%AE%B9%E5%99%A8/Docker%E5%9F%BA%E7%A1%80/">Docker基础</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E5%AE%B9%E5%99%A8/Containerd-%E6%90%AD%E5%BB%BA%E4%BB%A5%E5%8F%8A%E4%BD%BF%E7%94%A8/">Containerd 搭建以及使用</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/byte%E4%B8%80%E4%B8%AA%E5%AD%97%E8%8A%82%E7%9A%84%E6%95%B0%E6%8D%AE%E5%A4%A7%E5%B0%8F%E8%8C%83%E5%9B%B4%E4%B8%BA%E4%BB%80%E4%B9%88%E6%98%AF-128~127/">byte一个字节的数据大小范围为什么是-128~127</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8/MAC-%E7%BD%91%E6%98%93mumu%E5%AE%89%E5%8D%93%E6%A8%A1%E6%8B%9F%E5%99%A8%E4%BF%AE%E6%94%B9hosts/">MAC 网易mumu安卓模拟器修改hosts</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/VM/%E5%86%85%E7%BD%91%E8%AE%BF%E9%97%AE%E4%B8%8D%E5%88%B0%E5%AE%BF%E4%B8%BB%E6%9C%BA%E5%86%85%E9%83%A8centos%E8%99%9A%E6%8B%9F%E6%9C%BA/">内网访问不到宿主机内部centos虚拟机</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/TOOL/pierced%EF%BC%9A%E9%92%89%E9%92%89%E5%86%85%E7%BD%91%E7%A9%BF%E9%80%8F/">pierced钉钉内网穿透，仅支持80/443端口</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/Spring/SpringCloud/%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1/">负载均衡</a></li><li class="post-list-item"><a class="post-list-link" href="/2024/01/23/Spring/SpringCloud/%E6%9C%8D%E5%8A%A1%E6%B3%A8%E5%86%8C%E4%B8%8E%E5%8F%91%E7%8E%B0/">服务注册与发现</a></li></ul></div><div class="widget"><div class="widget-title"><i class="fa fa-external-link"> 友情链接</i></div></div></div></div><div class="pure-u-1 pure-u-md-3-4"><div id="footer">Copyright © 2024 <a href="/." rel="nofollow">Programming Notes.</a> Powered by<a rel="nofollow" target="_blank" href="https://hexo.io"> Hexo.</a><a rel="nofollow" target="_blank" href="https://github.com/tufu9441/maupassant-hexo"> Theme</a> by<a rel="nofollow" target="_blank" href="https://github.com/pagecho"> Cho.</a></div></div></div><a class="show" id="rocket" href="#top"></a><script type="text/javascript" src="/js/totop.js?v=1.0.0" async></script><script type="text/javascript" src="//lib.baomitu.com/fancybox/latest/jquery.fancybox.min.js"></script><script type="text/javascript" src="/js/fancybox.js?v=1.0.0"></script><link rel="stylesheet" type="text/css" href="//lib.baomitu.com/fancybox/latest/jquery.fancybox.min.css"><script type="text/javascript" src="/js/copycode.js?v=1.0.0" successtext="复制成功！"></script><link rel="stylesheet" type="text/css" href="/css/copycode.css?v=1.0.0"><script type="text/javascript" src="/js/codeblock-resizer.js?v=1.0.0"></script><script type="text/javascript" src="/js/smartresize.js?v=1.0.0"></script></div></body></html>
